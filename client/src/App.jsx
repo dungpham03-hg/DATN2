@@ -8,12 +8,12 @@ import PublicOnlyRoute from './components/Auth/PublicOnlyRoute';
 import Layout from './components/Layout';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
-import Meetings from './pages/Meetings';
-import MeetingDetail from './pages/MeetingDetail';
-import CreateMeeting from './pages/CreateMeeting';
-import EditMeeting from './pages/EditMeeting';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Profile from './pages/Profile/Profile';
+import Meetings from './pages/Meetings/Meetings';
+import MeetingDetail from './pages/Meetings/MeetingDetail';
+import CreateMeeting from './pages/Meetings/CreateMeeting';
+// import EditMeeting from './pages/Meetings/EditMeeting';
 import OAuthCallback from './components/OAuth/OAuthCallback';
 
 function App() {
@@ -40,7 +40,7 @@ function App() {
               <Route path="/meetings" element={<Meetings />} />
               <Route path="/meetings/create" element={<CreateMeeting />} />
               <Route path="/meetings/:id" element={<MeetingDetail />} />
-              <Route path="/meetings/:id/edit" element={<EditMeeting />} />
+              {/* <Route path="/meetings/:id/edit" element={<EditMeeting />} /> */}
             </Route>
           </Routes>
         </Router>

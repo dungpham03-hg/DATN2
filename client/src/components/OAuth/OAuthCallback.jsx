@@ -15,6 +15,7 @@ const OAuthCallback = () => {
         console.log('🔍 Current URL:', window.location.href);
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token');
+        const userParam = params.get('user');
         const error = params.get('error');
         
         console.log('🎫 Received token:', token);
@@ -31,7 +32,17 @@ const OAuthCallback = () => {
         console.log('✨ Processing login...');
         
         // Lưu token và cập nhật trạng thái đăng nhập
-        const result = await login(token);
+        let userOverride = undefined;
+        if (userParam) {
+          try {
+            userOverride = JSON.parse(decodeURIComponent(userParam));
+            console.log('🧑‍💻 User param decoded:', userOverride);
+          } catch (decodeErr) {
+            console.error('❌ Failed to decode user param:', decodeErr);
+          }
+        }
+
+        const result = await login(token, undefined, userOverride);
         console.log('✅ Login result:', result);
         
         // Đợi 150ms để Context cập nhật trước khi điều hướng

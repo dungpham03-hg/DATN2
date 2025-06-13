@@ -636,8 +636,9 @@ router.get('/google/callback',
       const token = generateToken(req.user._id);
       console.log('🎫 Generated token:', token);
       
-      // Trả về cả user info và token
-      const redirectUrl = `${CLIENT_URL}/oauth/callback?token=${token}`;
+      // Encode user thông tin để truyền lên frontend (đặt limit ~2KB)
+      const userData = encodeURIComponent(JSON.stringify(req.user));
+      const redirectUrl = `${CLIENT_URL}/oauth/callback?token=${token}&user=${userData}`;
       
       console.log('🔄 Redirecting to:', redirectUrl);
       res.redirect(redirectUrl);
@@ -668,8 +669,9 @@ router.get('/github/callback',
       const token = generateToken(req.user._id);
       console.log('🎫 Generated token:', token);
       
-      // Trả về cả user info và token
-      const redirectUrl = `${CLIENT_URL}/oauth/callback?token=${token}`;
+      // Encode user thông tin để truyền lên frontend (đặt limit ~2KB)
+      const userData = encodeURIComponent(JSON.stringify(req.user));
+      const redirectUrl = `${CLIENT_URL}/oauth/callback?token=${token}&user=${userData}`;
       
       console.log('🔄 Redirecting to:', redirectUrl);
       res.redirect(redirectUrl);
