@@ -1,48 +1,66 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { CircularProgress, Box, Typography, Alert } from '@mui/material';
+import React, { useEffect, useContext, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
+import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 
 const OAuthCallback = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login, dispatch } = useAuth();
+  const { login, isAuthenticated, dispatch } = useContext(AuthContext);
+
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      try {
-        console.log('🔍 Current URL:', window.location.href);
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get('token');
-        const userParam = params.get('user');
-        const error = params.get('error');
-        
-        console.log('🎫 Received token:', token);
-        console.log('👤 Received user param:', userParam);
-        console.log('❌ Received error:', error);
-        
-        if (error) {
-          throw new Error(error);
-        }
-        
-        if (!token) {
-          throw new Error('Không nhận được token từ OAuth provider');
-        }
+    console.log('=== OAuthCallback Mounted ===');
+    const params = Object.fromEntries(searchParams.entries());
+    console.log('URL Search Params:', params);
+    
+    const processOAuthCallback = async () => {
+      console.log('=== Starting OAuth Callback ===');
+      const token = searchParams.get('token');
+      const userParam = searchParams.get('user');
+      const errorParam = searchParams.get('error');
+      
+      // Log the authentication state
+      console.log('Current isAuthenticated:', isAuthenticated);
+      console.log('Token from URL:', token ? '***' + token.slice(-8) : 'Not found');
+      console.log('User param exists:', !!userParam);
+      
+      if (errorParam) {
+        const errorMessage = `OAuth Error: ${errorParam}`;
+        console.error(errorMessage);
+        setError(errorMessage);
+        setTimeout(() => navigate(`/login?error=${encodeURIComponent(errorMessage)}`, { replace: true }), 2000);
+        return;
+      }
+      
+      if (!token) {
+        const errorMessage = 'No authentication token found';
+        console.error(errorMessage);
+        setError(errorMessage);
+        setTimeout(() => navigate('/login?error=no_token', { replace: true }), 2000);
+        return;
+      }
 
-        console.log('✨ Processing OAuth callback...');
-        
-        // Parse user data if available
-        let userData = null;
+      try {
+        // If we have user data in the URL
         if (userParam) {
           try {
-            userData = JSON.parse(decodeURIComponent(userParam));
-            console.log('🧑‍💻 User data from OAuth:', userData);
+            console.log('Parsing user data from URL...');
+            const userData = JSON.parse(decodeURIComponent(userParam));
+            console.log('Parsed user data:', userData);
             
-            // Store the token in localStorage
+            // Validate required user fields
+            if (!userData._id || !userData.email) {
+              throw new Error('Invalid user data: missing required fields');
+            }
+            
+            // Store token in localStorage
+            console.log('Storing token in localStorage...');
             localStorage.setItem('token', token);
             
             // Update auth context
+            console.log('Dispatching LOGIN_SUCCESS...');
             dispatch({
               type: 'LOGIN_SUCCESS',
               payload: {
@@ -51,54 +69,70 @@ const OAuthCallback = () => {
               }
             });
             
-            // Redirect to dashboard after a short delay
-            console.log('✅ OAuth login successful, redirecting to dashboard...');
-            setTimeout(() => {
+            console.log('Auth context updated, navigating to dashboard...');
+            navigate('/dashboard', { replace: true });
+            
+          } catch (parseError) {
+            console.error('Error processing user data, falling back to token login:', parseError);
+            // Fallback to regular login with just the token
+            try {
+              await login(token);
               navigate('/dashboard', { replace: true });
-            }, 100);
-            
-            return; // Exit early on success
-            
-          } catch (decodeErr) {
-            console.error('❌ Failed to process user data:', decodeErr);
-            // Continue to fallback method if parsing fails
+            } catch (loginError) {
+              console.error('Fallback login failed:', loginError);
+              throw new Error('Failed to authenticate with token');
+            }
+          }
+        } else {
+          console.log('No user data in URL, using token login...');
+          try {
+            await login(token);
+            navigate('/dashboard', { replace: true });
+          } catch (error) {
+            console.error('Token login failed:', error);
+            throw new Error('Failed to authenticate with token');
           }
         }
-
-        
-        // Fallback method if user data is not available in URL
-        console.log('ℹ️ User data not in URL, trying to fetch user info...');
-        try {
-          const result = await login(token);
-          console.log('✅ Login result:', result);
-          
-          setTimeout(() => {
-            navigate('/dashboard', { replace: true });
-          }, 100);
-          
-        } catch (loginError) {
-          console.error('❌ Login failed:', loginError);
-          throw new Error('Không thể đăng nhập. Vui lòng thử lại.');
-        }
-        
       } catch (error) {
-        console.error('🚨 OAuth callback error:', error);
-        setError(error.message || 'Có lỗi xảy ra khi xử lý đăng nhập');
-        
-        // Wait 3 seconds before redirecting to login
+        console.error('Error during OAuth callback processing:', error);
+        setError(error.message || 'Authentication failed');
         setTimeout(() => {
           navigate('/login', { 
-            replace: true,
-            state: { 
-              error: error.message || 'Đăng nhập không thành công. Vui lòng thử lại sau.'
-            } 
+            state: { error: error.message || 'Authentication failed' },
+            replace: true 
           });
-        }, 3000);
+        }, 2000);
       }
     };
 
-    handleOAuthCallback();
-  }, [navigate, login, dispatch]);
+    processOAuthCallback();
+    
+    // Cleanup function
+    return () => {
+      console.log('=== OAuthCallback Unmounted ===');
+    };
+  }, [searchParams, navigate, login, dispatch, isAuthenticated]);
+
+  if (error) {
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        minHeight="100vh"
+        bgcolor="background.default"
+        p={3}
+      >
+        <Alert severity="error" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
+          {error}
+        </Alert>
+        <Typography variant="body1" color="textSecondary">
+          Redirecting to login page...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -107,24 +141,15 @@ const OAuthCallback = () => {
       alignItems="center"
       justifyContent="center"
       minHeight="100vh"
-      gap={2}
-      p={3}
+      bgcolor="background.default"
     >
-      <CircularProgress />
-      {error ? (
-        <>
-          <Alert severity="error" sx={{ width: '100%', maxWidth: 400 }}>
-            {error}
-          </Alert>
-          <Typography variant="body2" color="text.secondary">
-            Đang chuyển về trang đăng nhập...
-          </Typography>
-        </>
-      ) : (
-        <Typography variant="body1" color="text.secondary">
-          Đang xử lý đăng nhập...
-        </Typography>
-      )}
+      <CircularProgress size={60} thickness={4} />
+      <Typography variant="h6" color="textSecondary" mt={2}>
+        {error ? 'Authentication Error' : 'Processing login...'}
+      </Typography>
+      <Typography variant="body2" color="textSecondary" mt={2}>
+        {error ? error : 'Please wait...'}
+      </Typography>
     </Box>
   );
 };
