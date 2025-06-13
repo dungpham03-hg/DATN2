@@ -64,7 +64,7 @@ const authReducer = (state, action) => {
 };
 
 // Create context
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 // Custom hook to use auth context
 export const useAuth = () => {
@@ -313,6 +313,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     ...state,
+    dispatch,
     login,
     register,
     logout,

@@ -12,8 +12,8 @@ import {
   Divider,
   Stack
 } from '@mui/material';
-import GoogleIcon from '@mui/icons-material/Google';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
@@ -115,22 +115,41 @@ const Login = () => {
               </Typography>
             </Divider>
             
-            <Button
-              variant="outlined"
-              startIcon={<GoogleIcon />}
-              onClick={() => handleOAuthLogin('google')}
-              fullWidth
-              sx={{
-                borderColor: '#4285f4',
-                color: '#4285f4',
-                '&:hover': {
-                  borderColor: '#4285f4',
-                  backgroundColor: 'rgba(66, 133, 244, 0.04)'
+            {/* Google Login via @react-oauth/google */}
+            <GoogleLogin
+              width="100%"
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const { credential } = credentialResponse;
+                  if (!credential) throw new Error('Không nhận được credential');
+
+                  setLoading(true);
+                  // Gửi credential sang backend để đổi JWT nội bộ
+                  const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+                  const res = await fetch(`${apiUrl}/auth/google-token`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ credential })
+                  });
+                  if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.message || 'Xác thực Google thất bại');
+                  }
+                  const data = await res.json();
+
+                  await login(data.token, undefined, data.user);
+                  navigate('/dashboard');
+                } catch (err) {
+                  console.error(err);
+                  setError(err.message);
+                } finally {
+                  setLoading(false);
                 }
               }}
-            >
-              Đăng nhập bằng Google
-            </Button>
+              onError={() => setError('Đăng nhập Google thất bại')}
+            />
 
             <Button
               variant="outlined"

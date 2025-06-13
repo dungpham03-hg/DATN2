@@ -9,6 +9,7 @@ const {
 } = require('../middleware/auth');
 const passport = require('passport');
 const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
 
 const router = express.Router();
 
@@ -696,5 +697,77 @@ router.get('/microsoft/callback',
     res.redirect(`${CLIENT_URL}/oauth/callback?token=${token}`);
   }
 );
+
+// ===================== Google One Tap / React OAuth =====================
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+
+// @route   POST /api/auth/google-token
+// @desc    Verify Google ID token (One Tap / react-oauth) và trả JWT nội bộ
+// @access  Public
+router.post('/google-token', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: 'Thiếu credential' });
+    }
+
+    if (!googleClient) {
+      return res.status(500).json({ message: 'Server chưa cấu hình GOOGLE_CLIENT_ID' });
+    }
+
+    // Verify ID token với Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+
+    // payload: { sub, email, name, picture, email_verified, ... }
+    if (!payload.email_verified) {
+      return res.status(400).json({ message: 'Email chưa được xác thực' });
+    }
+
+    let user;
+    try {
+      user = await User.findOne({ email: payload.email });
+    } catch (dbErr) {
+      console.log('MongoDB not connected, fallback demo mode');
+    }
+
+    if (!user) {
+      // Tạo mới user với vai trò mặc định
+      try {
+        user = await User.create({
+          email: payload.email,
+          fullName: payload.name,
+          avatar: payload.picture,
+          googleId: payload.sub,
+          emailVerified: true,
+          password: Math.random().toString(36).slice(-8),
+          role: 'employee'
+        });
+      } catch (createErr) {
+        console.error('Error creating user:', createErr);
+      }
+    }
+
+    // Nếu Mongo lỗi, tạo user demo đơn giản
+    if (!user) {
+      user = {
+        _id: payload.sub,
+        email: payload.email,
+        fullName: payload.name,
+        role: 'employee'
+      };
+    }
+
+    const token = generateToken(user._id);
+    res.json({ token, user });
+  } catch (error) {
+    console.error('Google token verify error:', error);
+    res.status(500).json({ message: 'Xác thực Google thất bại' });
+  }
+});
 
 module.exports = router; 
