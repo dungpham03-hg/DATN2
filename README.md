@@ -30,16 +30,55 @@ cd meeting-management-app
 npm run install-all
 ```
 
-### Bước 3: Cấu hình môi trường
-Tạo file `.env` trong thư mục `server` với nội dung:
-```
-MONGODB_URI=your_mongodb_connection_string
+### Bước 3: Cấu hình biến môi trường
+Ứng dụng gồm hai phần `server` (Backend Node/Express) và `client` (Frontend React) nên mỗi phần cần một file `.env` riêng.
+
+#### 3.1 Backend – server/.env
+```env
+PORT=5000                               # Cổng chạy Express
+NODE_ENV=development                    # Môi trường
+
+# MongoDB
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/meeting_db?retryWrites=true&w=majority
+
+# JWT
 JWT_SECRET=your_jwt_secret_key
-PORT=5000
-NODE_ENV=development
+
+# Client URL dùng cho CORS và redirect OAuth
+CLIENT_URL=http://localhost:3000
+
+# Google OAuth
+GOOGLE_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
+
+# Microsoft OAuth (tuỳ chọn)
+MICROSOFT_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxx
+MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+MICROSOFT_CALLBACK_URL=http://localhost:5000/api/auth/microsoft/callback
+
+# Email SMTP (nếu sử dụng)
 EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_email_password
+EMAIL_PASS=your_email_app_password
 ```
+
+#### 3.2 Frontend – client/.env
+React chỉ đọc được các biến bắt đầu bằng `REACT_APP_`:
+
+```env
+# Địa chỉ API của backend
+REACT_APP_API_BASE_URL=http://localhost:5000
+
+# URL trang web (dùng cho redirect sau login)
+REACT_APP_SITE_URL=http://localhost:3000
+```
+
+Sau khi tạo xong hai file `.env`, hãy khởi động lại terminal hoặc chạy lại ứng dụng để thay đổi có hiệu lực.
 
 ### Bước 4: Chạy ứng dụng
 ```bash
