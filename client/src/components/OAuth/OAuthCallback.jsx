@@ -6,7 +6,7 @@ import { CircularProgress, Box, Typography, Alert } from '@mui/material';
 const OAuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, dispatch } = useAuth();
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -19,6 +19,7 @@ const OAuthCallback = () => {
         const error = params.get('error');
         
         console.log('🎫 Received token:', token);
+        console.log('👤 Received user param:', userParam);
         console.log('❌ Received error:', error);
         
         if (error) {
@@ -29,37 +30,67 @@ const OAuthCallback = () => {
           throw new Error('Không nhận được token từ OAuth provider');
         }
 
-        console.log('✨ Processing login...');
+        console.log('✨ Processing OAuth callback...');
         
-        // Lưu token và cập nhật trạng thái đăng nhập
-        let userOverride = undefined;
+        // Parse user data if available
+        let userData = null;
         if (userParam) {
           try {
-            userOverride = JSON.parse(decodeURIComponent(userParam));
-            console.log('🧑‍💻 User param decoded:', userOverride);
+            userData = JSON.parse(decodeURIComponent(userParam));
+            console.log('🧑‍💻 User data from OAuth:', userData);
+            
+            // Store the token in localStorage
+            localStorage.setItem('token', token);
+            
+            // Update auth context
+            dispatch({
+              type: 'LOGIN_SUCCESS',
+              payload: {
+                user: userData,
+                token: token
+              }
+            });
+            
+            // Redirect to dashboard after a short delay
+            console.log('✅ OAuth login successful, redirecting to dashboard...');
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 100);
+            
+            return; // Exit early on success
+            
           } catch (decodeErr) {
-            console.error('❌ Failed to decode user param:', decodeErr);
+            console.error('❌ Failed to process user data:', decodeErr);
+            // Continue to fallback method if parsing fails
           }
         }
 
-        const result = await login(token, undefined, userOverride);
-        console.log('✅ Login result:', result);
         
-        // Đợi 150ms để Context cập nhật trước khi điều hướng
-        setTimeout(() => {
-          console.log('🔄 Navigating to dashboard...');
-          navigate('/dashboard', { replace: true });
-        }, 150);
+        // Fallback method if user data is not available in URL
+        console.log('ℹ️ User data not in URL, trying to fetch user info...');
+        try {
+          const result = await login(token);
+          console.log('✅ Login result:', result);
+          
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true });
+          }, 100);
+          
+        } catch (loginError) {
+          console.error('❌ Login failed:', loginError);
+          throw new Error('Không thể đăng nhập. Vui lòng thử lại.');
+        }
+        
       } catch (error) {
         console.error('🚨 OAuth callback error:', error);
-        setError(error.message);
+        setError(error.message || 'Có lỗi xảy ra khi xử lý đăng nhập');
         
-        // Chờ 3 giây trước khi chuyển về trang login
+        // Wait 3 seconds before redirecting to login
         setTimeout(() => {
           navigate('/login', { 
             replace: true,
             state: { 
-              error: 'Đăng nhập không thành công. Vui lòng thử lại sau.'
+              error: error.message || 'Đăng nhập không thành công. Vui lòng thử lại sau.'
             } 
           });
         }, 3000);
@@ -67,7 +98,7 @@ const OAuthCallback = () => {
     };
 
     handleOAuthCallback();
-  }, [navigate, login]);
+  }, [navigate, login, dispatch]);
 
   return (
     <Box
