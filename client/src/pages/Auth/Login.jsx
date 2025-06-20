@@ -10,11 +10,14 @@ import {
   Alert,
   Link,
   Divider,
-  Stack
+  Stack,
+  IconButton,
+  InputAdornment
 } from '@mui/material';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -22,6 +25,7 @@ const Login = () => {
   const { login } = useAuth();
   const [error, setError] = useState(location.state?.error || '');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,23 +51,42 @@ const Login = () => {
   };
 
   return (
-    <Container maxWidth="sm">
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        p: 2,
+      }}
+    >
+      <Container maxWidth="sm" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Tiêu đề tên ứng dụng */}
+        <Typography variant="h4" fontWeight="bold" color="white" gutterBottom>
+        Quản lý cuộc họp
+      </Typography>
+
       <Box
         sx={{
-          marginTop: 8,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          width: '100%',
         }}
       >
         <Paper
-          elevation={3}
+            elevation={10}
           sx={{
-            padding: 4,
+              px: 5,
+              py: 6,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             width: '100%',
+              borderRadius: 4,
+              backdropFilter: 'blur(10px)',
+              backgroundColor: 'rgba(255,255,255,0.85)'
           }}
         >
           <Typography component="h1" variant="h5" gutterBottom>
@@ -93,9 +116,25 @@ const Login = () => {
               fullWidth
               name="password"
               label="Mật khẩu"
-              type="password"
+                type={showPassword ? 'text' : 'password'}
               id="password"
               autoComplete="current-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                        sx={{ color: 'text.secondary' }}
+                        disableRipple
+                        size="small"
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
             />
             <Button
               type="submit"
@@ -108,65 +147,68 @@ const Login = () => {
             </Button>
           </Box>
 
-          <Stack spacing={2} width="100%" mt={3}>
+          <Stack spacing={2} width="100%" mt={3} alignItems="center">
             <Divider>
               <Typography variant="body2" color="text.secondary">
                 Hoặc đăng nhập với
               </Typography>
             </Divider>
             
-            {/* Google Login via @react-oauth/google */}
-            <GoogleLogin
-              width="100%"
-              onSuccess={async (credentialResponse) => {
-                try {
-                  const { credential } = credentialResponse;
-                  if (!credential) throw new Error('Không nhận được credential');
+            {/* Google Login chỉ hiển thị icon */}
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <GoogleLogin
+                type="icon"
+                shape="circle"
+                theme="outline"
+                onSuccess={async (credentialResponse) => {
+                  try {
+                    const { credential } = credentialResponse;
+                    if (!credential) throw new Error('Không nhận được credential');
 
-                  setLoading(true);
-                  // Gửi credential sang backend để đổi JWT nội bộ
-                  const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
-                  const res = await fetch(`${apiUrl}/auth/google-token`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ credential })
-                  });
-                  if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.message || 'Xác thực Google thất bại');
+                    setLoading(true);
+                    // Gửi credential sang backend để đổi JWT nội bộ
+                    const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+                    const res = await fetch(`${apiUrl}/auth/google-token`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({ credential })
+                    });
+                    if (!res.ok) {
+                      const errData = await res.json();
+                      throw new Error(errData.message || 'Xác thực Google thất bại');
+                    }
+                    const data = await res.json();
+
+                    await login(data.token, undefined, data.user);
+                    navigate('/dashboard');
+                  } catch (err) {
+                    console.error(err);
+                    setError(err.message);
+                  } finally {
+                    setLoading(false);
                   }
-                  const data = await res.json();
+                }}
+                onError={() => setError('Đăng nhập Google thất bại')}
+              />
 
-                  await login(data.token, undefined, data.user);
-                  navigate('/dashboard');
-                } catch (err) {
-                  console.error(err);
-                  setError(err.message);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              onError={() => setError('Đăng nhập Google thất bại')}
-            />
-
-            <Button
-              variant="outlined"
-              startIcon={<GitHubIcon />}
-              onClick={() => handleOAuthLogin('github')}
-              fullWidth
-              sx={{
-                borderColor: '#24292e',
-                color: '#24292e',
-                '&:hover': {
-                  borderColor: '#24292e',
-                  backgroundColor: 'rgba(36, 41, 46, 0.04)'
-                }
-              }}
-            >
-              Đăng nhập bằng GitHub
-            </Button>
+              {/* GitHub Login chỉ hiển thị icon */}
+              <IconButton
+                onClick={() => handleOAuthLogin('github')}
+                sx={{
+                  border: '1px solid #24292e',
+                  width: 44,
+                  height: 44,
+                  color: '#24292e',
+                  '&:hover': {
+                    backgroundColor: 'rgba(36, 41, 46, 0.04)'
+                  }
+                }}
+              >
+                <GitHubIcon />
+              </IconButton>
+            </Box>
           </Stack>
 
           <Box sx={{ mt: 2 }}>
@@ -177,6 +219,7 @@ const Login = () => {
         </Paper>
       </Box>
     </Container>
+    </Box>
   );
 };
 

@@ -9,8 +9,12 @@ const seedDatabase = async () => {
   try {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      ssl: true,
+      sslValidate: false,
+      retryWrites: true,
+      w: 'majority'
     });
     console.log('✅ Kết nối MongoDB thành công!');
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaCalendarAlt, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaLock, FaBuilding, FaBriefcase, FaPhone } from 'react-icons/fa';
+import { FaCalendarAlt, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaLock, FaBuilding, FaBriefcase, FaPhone, FaUserShield } from 'react-icons/fa';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
@@ -15,7 +15,8 @@ const Register = () => {
     confirmPassword: '',
     department: '',
     position: '',
-    phone: ''
+    phone: '',
+    role: 'employee'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -95,6 +96,11 @@ const Register = () => {
       newErrors.phone = 'Số điện thoại không hợp lệ';
     }
     
+    // Role validation
+    if (!formData.role) {
+      newErrors.role = 'Vai trò là bắt buộc';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -126,7 +132,8 @@ const Register = () => {
           password: formData.password,
           department: formData.department || undefined,
           position: formData.position || undefined,
-          phone: formData.phone || undefined
+          phone: formData.phone || undefined,
+          role: formData.role
         }),
       });
 
@@ -148,7 +155,8 @@ const Register = () => {
             password: formData.password,
             department: formData.department || undefined,
             position: formData.position || undefined,
-            phone: formData.phone || undefined
+            phone: formData.phone || undefined,
+            role: formData.role
           }),
         });
 
@@ -197,7 +205,8 @@ const Register = () => {
             password: formData.password,
             department: formData.department || undefined,
             position: formData.position || undefined,
-            phone: formData.phone || undefined
+            phone: formData.phone || undefined,
+            role: formData.role
           }),
         });
 
@@ -415,6 +424,32 @@ const Register = () => {
                   <Form.Control.Feedback type="invalid">
                     {errors.phone}
                   </Form.Control.Feedback>
+                </Form.Group>
+
+                {/* Role */}
+                <Form.Group className="mb-4">
+                  <Form.Label>
+                    <FaUserShield className="me-2 text-muted" />
+                    Vai trò *
+                  </Form.Label>
+                  <Form.Select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    isInvalid={!!errors.role}
+                    disabled={loading}
+                  >
+                    <option value="employee">Nhân viên</option>
+                    <option value="secretary">Thư ký</option>
+                    <option value="manager">Quản lý</option>
+                    <option value="admin">Quản trị viên</option>
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.role}
+                  </Form.Control.Feedback>
+                  <Form.Text className="text-muted">
+                    Chọn vai trò phù hợp với chức vụ của bạn trong tổ chức
+                  </Form.Text>
                 </Form.Group>
 
                 <Button

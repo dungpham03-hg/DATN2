@@ -217,7 +217,54 @@ const Profile = () => {
                       </div>
                       <h4>{user?.fullName}</h4>
                       <p className="text-muted">{user?.email}</p>
+                      <Badge bg={
+                        user?.role === 'admin' ? 'danger' :
+                        user?.role === 'manager' ? 'primary' :
+                        user?.role === 'secretary' ? 'info' :
+                        'secondary'
+                      } className="fs-6">
+                        {user?.role === 'admin' ? 'Quản trị viên' :
+                         user?.role === 'manager' ? 'Quản lý' :
+                         user?.role === 'secretary' ? 'Thư ký' :
+                         'Nhân viên'}
+                      </Badge>
                     </div>
+
+                    {/* Thông tin về quyền */}
+                    <Alert variant="info" className="mb-4">
+                      <h6>Quyền hạn của bạn:</h6>
+                      {user?.role === 'admin' && (
+                        <ul className="mb-0">
+                          <li>Xem và quản lý tất cả cuộc họp</li>
+                          <li>Tạo, sửa, xóa mọi cuộc họp</li>
+                          <li>Quản lý người dùng và hệ thống</li>
+                        </ul>
+                      )}
+                      {user?.role === 'manager' && (
+                        <ul className="mb-0">
+                          <li>Tạo và quản lý cuộc họp</li>
+                          <li>Xem tất cả cuộc họp công khai</li>
+                          <li>Xem cuộc họp riêng tư trong phòng ban</li>
+                          <li>Mời người tham gia cuộc họp</li>
+                        </ul>
+                      )}
+                      {user?.role === 'secretary' && (
+                        <ul className="mb-0">
+                          <li>Tạo và quản lý cuộc họp</li>
+                          <li>Xem tất cả cuộc họp công khai</li>
+                          <li>Xem cuộc họp riêng tư trong phòng ban</li>
+                          <li>Hỗ trợ lập biên bản cuộc họp</li>
+                        </ul>
+                      )}
+                      {user?.role === 'employee' && (
+                        <ul className="mb-0">
+                          <li>Xem cuộc họp công khai</li>
+                          <li>Xem cuộc họp riêng tư khi được mời</li>
+                          <li>Tham gia và phản hồi lời mời</li>
+                          <li><strong>Lưu ý:</strong> Không thể xem cuộc họp riêng tư của phòng ban nếu không được mời</li>
+                        </ul>
+                      )}
+                    </Alert>
 
                     {profileMessage && (
                       <Alert variant={profileMessage.includes('thành công') ? 'success' : 'danger'}>

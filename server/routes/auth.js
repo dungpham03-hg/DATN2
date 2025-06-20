@@ -90,25 +90,18 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Tạo user mới
     const userData = {
       fullName,
       email,
-      password: hashedPassword,
+      password,
       department,
       position,
-      phone
+      phone,
+      role: role || 'employee' // Cho phép user chọn role
     };
 
-    // Chỉ admin mới có thể tạo tài khoản admin/manager
-    if (role && ['admin', 'manager'].includes(role)) {
-      // TODO: Thêm logic kiểm tra quyền admin khi tạo tài khoản có role cao
-      userData.role = 'employee'; // Mặc định tạo employee
-    }
+
 
     const user = new User(userData);
     await user.save();
@@ -567,7 +560,7 @@ router.get('/test-me', authenticateToken, async (req, res) => {
 // @access  Public
 router.post('/test-register', registerValidation, handleValidationErrors, async (req, res) => {
   try {
-    const { fullName, email, password, department, position, phone } = req.body;
+    const { fullName, email, password, department, position, phone, role } = req.body;
 
     // Kiểm tra email đã tồn tại trong demo accounts
     const existingDemoEmails = [
@@ -587,7 +580,7 @@ router.post('/test-register', registerValidation, handleValidationErrors, async 
       _id: '507f1f77bcf86cd799439014', // Fake ObjectId
       fullName,
       email,
-      role: 'employee',
+      role: role || 'employee',
       department: department || 'General',
       position: position || 'Employee',
       phone: phone || '',
@@ -767,6 +760,63 @@ router.post('/google-token', async (req, res) => {
   } catch (error) {
     console.error('Google token verify error:', error);
     res.status(500).json({ message: 'Xác thực Google thất bại' });
+  }
+});
+
+// @route   GET /api/auth/profile
+// @desc    Lấy thông tin profile của user hiện tại
+// @access  Private
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Người dùng không tồn tại' });
+    }
+    res.json({ user });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Lỗi server khi lấy thông tin người dùng' });
+  }
+});
+
+// @route   GET /api/auth/users
+// @desc    Lấy danh sách người dùng trong hệ thống (để mời vào meeting)
+// @access  Private
+router.get('/users', authenticateToken, async (req, res) => {
+  try {
+    const { search, department } = req.query;
+    
+    // Build query
+    let query = {};
+    
+    // Tìm kiếm theo tên hoặc email
+    if (search) {
+      query.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Lọc theo phòng ban
+    if (department) {
+      query.department = department;
+    }
+    
+    // Lấy danh sách users (không lấy password)
+    const users = await User.find(query)
+      .select('fullName email department avatar role')
+      .sort('fullName');
+    
+    res.json({ 
+      message: 'Lấy danh sách người dùng thành công',
+      users 
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ 
+      message: 'Lỗi server khi lấy danh sách người dùng',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
   }
 });
 

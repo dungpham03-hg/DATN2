@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Meeting Rooms API</title>
+</head>
+<body>
+    <h1>Debug Meeting Rooms API</h1>
+    <div>
+        <button onclick="checkAuth()">Check Auth</button>
+        <button onclick="fetchRooms()">Fetch Rooms</button>
+        <button onclick="clearStorage()">Clear Storage</button>
+    </div>
+    <br>
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        const resultsDiv = document.getElementById('results');
+
+        function log(message) {
+            console.log(message);
+            resultsDiv.innerHTML += '<div>' + JSON.stringify(message, null, 2) + '</div><br>';
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            log('✅ Cleared localStorage');
+        }
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            log('🔑 Token in localStorage: ' + (token ? token.substring(0, 50) + '...' : 'NULL'));
+            
+            if (token) {
+                fetch(API_BASE + '/auth/me', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    log('✅ Auth check result: ' + JSON.stringify(data));
+                })
+                .catch(error => {
+                    log('❌ Auth check error: ' + error.message);
+                });
+            }
+        }
+
+        function fetchRooms() {
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                log('❌ No token found');
+                return;
+            }
+
+            log('🔍 Fetching rooms with token...');
+            
+            fetch(API_BASE + '/meeting-rooms', {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                log('📊 Response status: ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                log('✅ Rooms data: ' + JSON.stringify(data, null, 2));
+            })
+            .catch(error => {
+                log('❌ Fetch rooms error: ' + error.message);
+            });
+        }
+
+        // Auto check on load
+        window.onload = function() {
+            log('🚀 Page loaded');
+            checkAuth();
+        };
+    </script>
+</body>
+</html> 

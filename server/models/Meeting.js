@@ -21,6 +21,10 @@ const meetingSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'Thời gian kết thúc là bắt buộc']
   },
+  actualEndTime: {
+    type: Date,
+    // Thời gian kết thúc thực tế khi đóng họp sớm
+  },
   location: {
     type: String,
     trim: true,
@@ -136,6 +140,22 @@ const meetingSchema = new mongoose.Schema({
       default: false
     }
   }],
+  messages: [{
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      maxlength: 1000
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   tags: [{
     type: String,
     trim: true,
@@ -148,7 +168,63 @@ const meetingSchema = new mongoose.Schema({
   isPrivate: {
     type: Boolean,
     default: false
-  }
+  },
+  summary: {
+    type: String,
+    maxlength: [5000, 'Tóm tắt không được vượt quá 5000 ký tự']
+  },
+  summaryImage: {
+    type: String // Đường dẫn đến file ảnh tóm tắt
+  },
+  notes: [{
+    text: {
+      type: String,
+      required: true,
+      maxlength: 1000
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  summaryMessages: [{
+    text: {
+      type: String,
+      maxlength: 5000
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    attachments: [{
+      name: {
+        type: String,
+        required: true
+      },
+      path: {
+        type: String,
+        required: true
+      },
+      size: {
+        type: Number
+      },
+      type: {
+        type: String,
+        enum: ['image', 'file'],
+        required: true
+      }
+    }],
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

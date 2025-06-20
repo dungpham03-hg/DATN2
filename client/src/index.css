@@ -143,6 +143,7 @@ code {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--gray-200);
   padding: 1rem 0;
+  z-index: 1000;
 }
 
 .navbar-brand {
@@ -1099,4 +1100,39 @@ code {
   .profile-user-email {
     font-size: 0.9rem;
   }
+}
+
+/* Hide default password reveal in Edge/IE */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+/* Dropdown menu z-index fix */
+.navbar .dropdown-menu {
+  z-index: 9999 !important;
+}
+
+.dropdown-menu.show {
+  z-index: 9999 !important;
+}
+
+/* Hover effects */
+.hover-bg-light:hover {
+  background-color: #f8f9fa;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Badge styles */
+.badge {
+  font-weight: normal;
+}
+
+/* Form switch custom styles */
+.form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
 } 

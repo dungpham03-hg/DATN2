@@ -1,0 +1,42 @@
+/* MeetingRooms page custom styles */
+
+.meeting-rooms-section .card {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border-radius: 0.75rem;
+}
+
+.meeting-rooms-section .table > thead {
+  background: linear-gradient(90deg, #e9f1ff 0%, #f6f9ff 100%);
+}
+
+.meeting-rooms-section .table > thead > tr > th {
+  border-bottom: none;
+  font-weight: 600;
+  color: #4a4a4a;
+}
+
+.meeting-rooms-section .table > tbody > tr {
+  transition: background-color 0.2s ease;
+}
+
+.meeting-rooms-section .table > tbody > tr:hover {
+  background-color: #f5f9ff;
+}
+
+/* Improve appearance of facility badges */
+.meeting-rooms-section .badge.bg-secondary {
+  background-color: #eef2ff !important;
+  color: #4356e6 !important;
+  font-weight: 500;
+}
+
+/* Compact action buttons */
+.meeting-rooms-section .btn-sm {
+  padding: 0.25rem 0.5rem;
+}
+
+.meeting-rooms-section .table td,
+.meeting-rooms-section .table th {
+  vertical-align: middle;
+} 
