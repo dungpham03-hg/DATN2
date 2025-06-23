@@ -30,7 +30,7 @@ app.use(cors());
 app.use(express.json());
 app.use(passport.initialize());
 
-// Connect to MongoDB với cấu hình SSL cải thiện
+// Connect to MongoDB với cấu hình tối ưu
 mongoose.connect(process.env.MONGODB_URI, {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
