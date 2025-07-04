@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Table, Modal, Form, Badge, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Table, Modal, Form, Badge, Alert } from 'react-bootstrap';
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaWifi, FaTv, FaChalkboard, FaVideo, FaSync } from 'react-icons/fa';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import './MeetingRooms.css';
 
 const MeetingRooms = () => {
   const { token, user } = useAuth();
+  const { success, error: notify, warning } = useNotification();
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
   const [rooms, setRooms] = useState([]);
@@ -94,7 +96,8 @@ const MeetingRooms = () => {
     setEditingRoom(null);
   };
 
-  const handleInputChange = (e) => {
+  const handleChange = (e) => {
+    if (!e?.target) return;
     const { name, value } = e.target;
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
@@ -141,7 +144,7 @@ const MeetingRooms = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         console.log('Update response:', response.data);
-        alert('Cập nhật phòng họp thành công');
+        success('Cập nhật phòng họp thành công');
       } else {
         response = await axios.post(
           `${API_BASE_URL}/meeting-rooms`,
@@ -149,7 +152,7 @@ const MeetingRooms = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         console.log('Create response:', response.data);
-        alert('Tạo phòng họp thành công');
+        success('Tạo phòng họp thành công');
       }
       
       handleCloseModal();
@@ -173,7 +176,7 @@ const MeetingRooms = () => {
         errorMessage = err.response.data.errors.map(e => e.msg).join(', ');
       }
       
-      alert(errorMessage);
+      notify(errorMessage);
     }
   };
 
@@ -185,10 +188,10 @@ const MeetingRooms = () => {
         `${API_BASE_URL}/meeting-rooms/${roomId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert('Vô hiệu hóa phòng họp thành công');
+      success('Vô hiệu hóa phòng họp thành công');
       fetchRooms();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra');
+      notify(err.response?.data?.message || 'Có lỗi xảy ra');
     }
   };
 
@@ -204,8 +207,28 @@ const MeetingRooms = () => {
 
   if (loading) {
     return (
-      <Container className="py-4 text-center">
-        <Spinner animation="border" />
+      <Container className="py-4">
+        <div className="loading-container fade-in">
+          <div className="loading-spinner">
+            <svg 
+              width="32" 
+              height="32" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+              className="loading-icon"
+            >
+              <path 
+                d="M3 3V9M3 9H9M3 9L6.293 5.707C7.923 4.077 10.081 3 12.5 3C17.194 3 21 6.806 21 11.5C21 16.194 17.194 20 12.5 20C7.806 20 4 16.194 4 11.5"
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
       </Container>
     );
   }
@@ -217,9 +240,29 @@ const MeetingRooms = () => {
           <div className="d-flex justify-content-between align-items-center">
             <h2>Quản lý phòng họp</h2>
             <div className="d-flex gap-2">
-              <Button variant="outline-secondary" onClick={fetchRooms} disabled={loading}>
-                <FaSync className="me-2" />
-                Làm mới
+              <Button 
+                variant="outline-secondary" 
+                className="refresh-btn"
+                onClick={fetchRooms} 
+                disabled={loading}
+                title="Làm mới"
+              >
+                <svg 
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="refresh-icon"
+                >
+                  <path 
+                    d="M3 3V9M3 9H9M3 9L6.293 5.707C7.923 4.077 10.081 3 12.5 3C17.194 3 21 6.806 21 11.5C21 16.194 17.194 20 12.5 20C7.806 20 4 16.194 4 11.5"
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </Button>
               {canManageRooms && (
                 <Button variant="primary" onClick={() => handleOpenModal()}>
@@ -339,7 +382,7 @@ const MeetingRooms = () => {
                     type="text"
                     name="name"
                     value={formData.name}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     placeholder="VD: Phòng A2-101, Phòng họp tầng 2, Conference Room 01"
                     required
                   />
@@ -355,7 +398,7 @@ const MeetingRooms = () => {
                     type="number"
                     name="capacity"
                     value={formData.capacity}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     min="1"
                     max="500"
                     required
@@ -372,7 +415,7 @@ const MeetingRooms = () => {
                     type="text"
                     name="location.floor"
                     value={formData.location.floor}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     required
                   />
                 </Form.Group>
@@ -384,7 +427,7 @@ const MeetingRooms = () => {
                     type="text"
                     name="location.building"
                     value={formData.location.building}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                   />
                 </Form.Group>
               </Col>
@@ -395,7 +438,7 @@ const MeetingRooms = () => {
                     type="text"
                     name="location.address"
                     value={formData.location.address}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                   />
                 </Form.Group>
               </Col>
@@ -432,7 +475,7 @@ const MeetingRooms = () => {
                 rows={3}
                 name="description"
                 value={formData.description}
-                onChange={handleInputChange}
+                onChange={handleChange}
               />
             </Form.Group>
           </Modal.Body>

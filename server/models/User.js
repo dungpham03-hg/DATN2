@@ -75,11 +75,19 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
-    meetingReminder: {
+    push: {
       type: Boolean,
       default: true
     },
-    agendaUpdate: {
+    meetingReminders: {
+      type: Boolean,
+      default: true
+    },
+    statusUpdates: {
+      type: Boolean,
+      default: false
+    },
+    weeklyReports: {
       type: Boolean,
       default: true
     }

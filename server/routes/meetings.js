@@ -111,7 +111,16 @@ const meetingValidation = [
   body('attendees.*')
     .optional()
     .isMongoId()
-    .withMessage('ID người tham gia không hợp lệ')
+    .withMessage('ID người tham gia không hợp lệ'),
+  
+  body('organizer')
+    .isMongoId()
+    .withMessage('ID người chủ trì không hợp lệ'),
+  
+  body('secretary')
+    .optional()
+    .isMongoId()
+    .withMessage('ID thư ký không hợp lệ')
 ];
 
 // Helper function để xử lý validation errors
@@ -208,6 +217,7 @@ router.get('/', authenticateToken, checkDepartmentAccess, async (req, res) => {
       sort: { startTime: 1 },
       populate: [
         { path: 'organizer', select: 'fullName email avatar' },
+        { path: 'secretary', select: 'fullName email avatar' },
         { path: 'attendees.user', select: 'fullName email avatar' }
       ]
     };
@@ -243,11 +253,14 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id)
       .populate('organizer', 'fullName email avatar department position')
+      .populate('secretary', 'fullName email avatar department position')
       .populate('attendees.user', 'fullName email avatar department position')
       .populate('agenda')
       .populate('minutes')
       .populate('messages.sender', 'fullName email avatar')
-      .populate('summaryMessages.author', 'fullName email avatar');
+      .populate('summaryMessages.author', 'fullName email avatar')
+      .populate('summaryFiles.uploadedBy', 'fullName email avatar')
+      .populate('notes.author', 'fullName email avatar');
 
     if (!meeting) {
       return res.status(404).json({
@@ -312,7 +325,9 @@ router.post('/', authenticateToken, meetingValidation, handleValidationErrors, a
       priority,
       attendees,
       tags,
-      isPrivate
+      isPrivate,
+      organizer,
+      secretary
     } = req.body;
 
     // Tạo meeting data
@@ -325,7 +340,8 @@ router.post('/', authenticateToken, meetingValidation, handleValidationErrors, a
       meetingLink,
       meetingType: meetingType || 'offline',
       priority: priority || 'medium',
-      organizer: req.user._id,
+      organizer: organizer,
+      secretary: secretary || null,
       department: req.user.department,
       tags: tags || [],
       isPrivate: isPrivate || false
@@ -342,9 +358,10 @@ router.post('/', authenticateToken, meetingValidation, handleValidationErrors, a
     const meeting = new Meeting(meetingData);
     await meeting.save();
 
-    // Populate thông tin organizer và attendees
+    // Populate thông tin organizer, secretary và attendees
     await meeting.populate([
       { path: 'organizer', select: 'fullName email avatar' },
+      { path: 'secretary', select: 'fullName email avatar' },
       { path: 'attendees.user', select: 'fullName email avatar' }
     ]);
 
@@ -404,9 +421,17 @@ router.put('/:id', authenticateToken, checkResourceOwnership('organizer'), meeti
     }
 
     // Kiểm tra quyền chỉnh sửa
-    if (req.user.role !== 'admin' && meeting.organizer.toString() !== req.user._id.toString()) {
+    const isOwnerOrAdmin = req.user.role === 'admin' || meeting.organizer.toString() === req.user._id.toString();
+    const canEditAgenda = ['admin', 'manager', 'secretary'].includes(req.user.role);
+    
+    // Nếu chỉ update agenda, secretary/manager có thể edit
+    const onlyUpdatingAgenda = Object.keys(req.body).length === 1 && req.body.agenda !== undefined;
+    
+    if (!isOwnerOrAdmin && !(onlyUpdatingAgenda && canEditAgenda)) {
       return res.status(403).json({
-        message: 'Chỉ người tổ chức hoặc admin mới có thể chỉnh sửa cuộc họp'
+        message: onlyUpdatingAgenda 
+          ? 'Bạn không có quyền chỉnh sửa chương trình cuộc họp'
+          : 'Chỉ người tổ chức hoặc admin mới có thể chỉnh sửa cuộc họp'
       });
     }
 
@@ -428,7 +453,10 @@ router.put('/:id', authenticateToken, checkResourceOwnership('organizer'), meeti
       priority,
       attendees,
       tags,
-      isPrivate
+      isPrivate,
+      agenda,
+      organizer,
+      secretary
     } = req.body;
 
     // Cập nhật dữ liệu
@@ -442,7 +470,10 @@ router.put('/:id', authenticateToken, checkResourceOwnership('organizer'), meeti
       meetingType,
       priority,
       tags,
-      isPrivate
+      isPrivate,
+      agenda,
+      organizer,
+      secretary
     };
 
     // Cập nhật attendees nếu có
@@ -467,6 +498,7 @@ router.put('/:id', authenticateToken, checkResourceOwnership('organizer'), meeti
       { new: true, runValidators: true }
     ).populate([
       { path: 'organizer', select: 'fullName email avatar' },
+      { path: 'secretary', select: 'fullName email avatar' },
       { path: 'attendees.user', select: 'fullName email avatar' }
     ]);
 
@@ -837,12 +869,10 @@ router.post('/:id/summary-image', authenticateToken, upload.single('summaryImage
   }
 });
 
-// @route   PUT /api/meetings/:id/summary
-// @desc    Cập nhật tóm tắt cuộc họp
+// @route   DELETE /api/meetings/:id/summary-image
+// @desc    Xóa ảnh tóm tắt cuộc họp
 // @access  Private (Secretary, Manager, Admin)
-router.put('/:id/summary', authenticateToken, [
-  body('summary').optional().trim().isLength({ max: 5000 }).withMessage('Tóm tắt không được vượt quá 5000 ký tự')
-], handleValidationErrors, async (req, res) => {
+router.delete('/:id/summary-image', authenticateToken, async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
     
@@ -852,6 +882,71 @@ router.put('/:id/summary', authenticateToken, [
       });
     }
 
+    // Kiểm tra quyền xóa ảnh summary
+    const canDeleteSummaryImage = 
+      req.user.role === 'admin' ||
+      req.user.role === 'manager' ||
+      req.user.role === 'secretary' ||
+      meeting.organizer.toString() === req.user._id.toString();
+
+    if (!canDeleteSummaryImage) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền xóa ảnh tóm tắt cuộc họp'
+      });
+    }
+
+    // Xóa file ảnh nếu có
+    if (meeting.summaryImage) {
+      const imagePath = path.join(__dirname, '../', meeting.summaryImage);
+      try {
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+        }
+      } catch (error) {
+        console.error('Error deleting summary image file:', error);
+      }
+    }
+
+    // Xóa đường dẫn ảnh trong database
+    meeting.summaryImage = null;
+    await meeting.save();
+
+    res.json({
+      message: 'Xóa ảnh tóm tắt thành công'
+    });
+
+  } catch (error) {
+    console.error('Delete summary image error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi xóa ảnh tóm tắt',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   PUT /api/meetings/:id/summary
+// @desc    Cập nhật tóm tắt cuộc họp
+// @access  Private (Secretary, Manager, Admin)
+router.put('/:id/summary', authenticateToken, [
+  body('summary').optional().trim().isLength({ max: 5000 }).withMessage('Tóm tắt không được vượt quá 5000 ký tự')
+], handleValidationErrors, async (req, res) => {
+  try {
+    console.log('=== BACKEND SUMMARY UPDATE ===');
+    console.log('Meeting ID:', req.params.id);
+    console.log('Request body:', req.body);
+    console.log('User:', req.user.fullName, req.user.role);
+    
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      console.log('Meeting not found!');
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    console.log('Current meeting summary:', meeting.summary);
+
     // Kiểm tra quyền cập nhật summary
     const canUpdateSummary = 
       req.user.role === 'admin' ||
@@ -859,14 +954,20 @@ router.put('/:id/summary', authenticateToken, [
       req.user.role === 'secretary' ||
       meeting.organizer.toString() === req.user._id.toString();
 
+    console.log('Can update summary:', canUpdateSummary);
+
     if (!canUpdateSummary) {
       return res.status(403).json({
         message: 'Bạn không có quyền cập nhật tóm tắt cuộc họp'
       });
     }
 
+    const oldSummary = meeting.summary;
     meeting.summary = req.body.summary;
     await meeting.save();
+
+    console.log('Summary updated from:', JSON.stringify(oldSummary));
+    console.log('Summary updated to:', JSON.stringify(meeting.summary));
 
     res.json({
       message: 'Cập nhật tóm tắt cuộc họp thành công',
@@ -936,6 +1037,121 @@ router.post('/:id/notes', authenticateToken, [
     console.error('Add note error:', error);
     res.status(500).json({
       message: 'Lỗi server khi thêm ghi chú',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   PUT /api/meetings/:id/notes/:noteId
+// @desc    Cập nhật ghi chú của cuộc họp
+// @access  Private (Author, Admin)
+router.put('/:id/notes/:noteId', authenticateToken, [
+  body('text').trim().isLength({ min: 1, max: 1000 }).withMessage('Ghi chú phải từ 1-1000 ký tự')
+], handleValidationErrors, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Tìm note trong meeting.notes
+    const noteIndex = meeting.notes.findIndex(
+      note => note._id.toString() === req.params.noteId
+    );
+
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        message: 'Ghi chú không tồn tại'
+      });
+    }
+
+    const note = meeting.notes[noteIndex];
+
+    // Kiểm tra quyền chỉnh sửa (author hoặc admin)
+    const canEdit = 
+      req.user.role === 'admin' ||
+      note.author.toString() === req.user._id.toString();
+
+    if (!canEdit) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền chỉnh sửa ghi chú này'
+      });
+    }
+
+    // Cập nhật nội dung
+    meeting.notes[noteIndex].text = req.body.text;
+    await meeting.save();
+
+    // Populate author info
+    await meeting.populate('notes.author', 'fullName email avatar');
+    const updatedNote = meeting.notes[noteIndex];
+
+    res.json({
+      message: 'Cập nhật ghi chú thành công',
+      note: updatedNote
+    });
+
+  } catch (error) {
+    console.error('Update note error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi cập nhật ghi chú',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   DELETE /api/meetings/:id/notes/:noteId
+// @desc    Xóa ghi chú của cuộc họp
+// @access  Private (Author, Admin)
+router.delete('/:id/notes/:noteId', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Tìm note trong meeting.notes
+    const noteIndex = meeting.notes.findIndex(
+      note => note._id.toString() === req.params.noteId
+    );
+
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        message: 'Ghi chú không tồn tại'
+      });
+    }
+
+    const note = meeting.notes[noteIndex];
+
+    // Kiểm tra quyền xóa (author hoặc admin)
+    const canDelete = 
+      req.user.role === 'admin' ||
+      note.author.toString() === req.user._id.toString();
+
+    if (!canDelete) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền xóa ghi chú này'
+      });
+    }
+
+    // Xóa note từ database
+    meeting.notes.splice(noteIndex, 1);
+    await meeting.save();
+
+    res.json({
+      message: 'Xóa ghi chú thành công'
+    });
+
+  } catch (error) {
+    console.error('Delete note error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi xóa ghi chú',
       error: process.env.NODE_ENV === 'development' ? error.message : {}
     });
   }
@@ -1033,6 +1249,76 @@ router.post('/:id/invite', authenticateToken, [
     console.error('Invite user error:', error);
     res.status(500).json({
       message: 'Lỗi server khi mời người tham gia',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   DELETE /api/meetings/:id/attendees/:userId
+// @desc    Loại bỏ người tham gia khỏi cuộc họp
+// @access  Private (Organizer, Admin, Manager)
+router.delete('/:id/attendees/:userId', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Kiểm tra quyền remove attendee
+    const canRemove = 
+      meeting.organizer.toString() === req.user._id.toString() ||
+      req.user.role === 'admin' ||
+      req.user.role === 'manager';
+
+    if (!canRemove) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền loại bỏ người tham gia khỏi cuộc họp này'
+      });
+    }
+
+    // Kiểm tra không thể remove chính người tổ chức
+    if (meeting.organizer.toString() === req.params.userId) {
+      return res.status(400).json({
+        message: 'Không thể loại bỏ người tổ chức khỏi cuộc họp'
+      });
+    }
+
+    // Tìm attendee trong danh sách
+    const attendeeIndex = meeting.attendees.findIndex(
+      att => att.user.toString() === req.params.userId
+    );
+
+    if (attendeeIndex === -1) {
+      return res.status(404).json({
+        message: 'Người dùng không có trong danh sách tham gia cuộc họp'
+      });
+    }
+
+    // Lấy thông tin attendee trước khi xóa
+    const removedAttendee = meeting.attendees[attendeeIndex];
+    
+    // Xóa khỏi danh sách attendees
+    meeting.attendees.splice(attendeeIndex, 1);
+    await meeting.save();
+
+    // Populate để trả về thông tin đầy đủ
+    await meeting.populate([
+      { path: 'organizer', select: 'fullName email avatar' },
+      { path: 'attendees.user', select: 'fullName email avatar' }
+    ]);
+
+    res.json({
+      message: 'Loại bỏ người tham gia thành công',
+      meeting
+    });
+
+  } catch (error) {
+    console.error('Remove attendee error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi loại bỏ người tham gia',
       error: process.env.NODE_ENV === 'development' ? error.message : {}
     });
   }
@@ -1279,6 +1565,425 @@ router.post('/:id/summary-message', authenticateToken, upload.array('attachments
     
     res.status(500).json({
       message: 'Lỗi server khi thêm tóm tắt cuộc họp',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   PUT /api/meetings/:id/summary-message/:messageId
+// @desc    Cập nhật summary message
+// @access  Private (Author, Admin)
+router.put('/:id/summary-message/:messageId', authenticateToken, [
+  body('text').optional().trim().isLength({ max: 5000 }).withMessage('Nội dung không được vượt quá 5000 ký tự')
+], handleValidationErrors, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Tìm message trong summaryMessages
+    const messageIndex = meeting.summaryMessages.findIndex(
+      msg => msg._id.toString() === req.params.messageId
+    );
+
+    if (messageIndex === -1) {
+      return res.status(404).json({
+        message: 'Tóm tắt không tồn tại'
+      });
+    }
+
+    const message = meeting.summaryMessages[messageIndex];
+
+    // Kiểm tra quyền chỉnh sửa (author hoặc admin)
+    const canEdit = 
+      req.user.role === 'admin' ||
+      message.author.toString() === req.user._id.toString();
+
+    if (!canEdit) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền chỉnh sửa tóm tắt này'
+      });
+    }
+
+    // Cập nhật nội dung
+    meeting.summaryMessages[messageIndex].text = req.body.text;
+    await meeting.save();
+
+    // Populate author info
+    await meeting.populate('summaryMessages.author', 'fullName email avatar');
+    const updatedMessage = meeting.summaryMessages[messageIndex];
+
+    res.json({
+      message: 'Cập nhật tóm tắt thành công',
+      summaryMessage: updatedMessage
+    });
+
+  } catch (error) {
+    console.error('Update summary message error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi cập nhật tóm tắt',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   DELETE /api/meetings/:id/summary-message/:messageId
+// @desc    Xóa summary message
+// @access  Private (Author, Admin)
+router.delete('/:id/summary-message/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Tìm message trong summaryMessages
+    const messageIndex = meeting.summaryMessages.findIndex(
+      msg => msg._id.toString() === req.params.messageId
+    );
+
+    if (messageIndex === -1) {
+      return res.status(404).json({
+        message: 'Tóm tắt không tồn tại'
+      });
+    }
+
+    const message = meeting.summaryMessages[messageIndex];
+
+    // Kiểm tra quyền xóa (author hoặc admin)
+    const canDelete = 
+      req.user.role === 'admin' ||
+      message.author.toString() === req.user._id.toString();
+
+    if (!canDelete) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền xóa tóm tắt này'
+      });
+    }
+
+    // Xóa files đính kèm từ server nếu có
+    if (message.attachments && message.attachments.length > 0) {
+      for (const attachment of message.attachments) {
+        const filePath = path.join(__dirname, '../', attachment.path);
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (error) {
+          console.error('Error deleting attachment file:', error);
+        }
+      }
+    }
+
+    // Xóa message từ database
+    meeting.summaryMessages.splice(messageIndex, 1);
+    await meeting.save();
+
+    res.json({
+      message: 'Xóa tóm tắt thành công'
+    });
+
+  } catch (error) {
+    console.error('Delete summary message error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi xóa tóm tắt',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   POST /api/meetings/:id/summary-files
+// @desc    Upload files vào summary của cuộc họp
+// @access  Private (Secretary, Manager, Admin)
+router.post('/:id/summary-files', authenticateToken, upload.array('files', 10), async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Kiểm tra quyền upload file vào summary
+    const canUploadSummaryFiles = 
+      req.user.role === 'admin' ||
+      req.user.role === 'manager' ||
+      req.user.role === 'secretary' ||
+      meeting.organizer.toString() === req.user._id.toString();
+
+    if (!canUploadSummaryFiles) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền upload file vào tóm tắt cuộc họp'
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        message: 'Vui lòng chọn ít nhất một file để upload'
+      });
+    }
+
+    // Thêm files vào summaryFiles array
+    if (!meeting.summaryFiles) {
+      meeting.summaryFiles = [];
+    }
+
+    for (const file of req.files) {
+      meeting.summaryFiles.push({
+        name: file.originalname,
+        path: `/uploads/meetings/${file.filename}`,
+        size: file.size,
+        uploadedBy: req.user._id,
+        uploadedAt: new Date()
+      });
+    }
+
+    await meeting.save();
+
+    res.json({
+      message: `Upload ${req.files.length} file vào tóm tắt thành công`,
+      filesCount: req.files.length
+    });
+
+  } catch (error) {
+    console.error('Upload summary files error:', error);
+    
+    // Xóa files nếu có lỗi
+    if (req.files) {
+      for (const file of req.files) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      }
+    }
+    
+    res.status(500).json({
+      message: 'Lỗi server khi upload file vào tóm tắt',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   DELETE /api/meetings/:id/summary-files/:fileId
+// @desc    Xóa file từ summary của cuộc họp
+// @access  Private (Secretary, Manager, Admin)
+router.delete('/:id/summary-files/:fileId', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Kiểm tra quyền xóa file từ summary
+    const canDeleteSummaryFiles = 
+      req.user.role === 'admin' ||
+      req.user.role === 'manager' ||
+      req.user.role === 'secretary' ||
+      meeting.organizer.toString() === req.user._id.toString();
+
+    if (!canDeleteSummaryFiles) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền xóa file từ tóm tắt cuộc họp'
+      });
+    }
+
+    // Tìm file trong summaryFiles
+    const fileIndex = meeting.summaryFiles.findIndex(
+      file => file._id.toString() === req.params.fileId
+    );
+
+    if (fileIndex === -1) {
+      return res.status(404).json({
+        message: 'File không tồn tại trong tóm tắt'
+      });
+    }
+
+    const fileToDelete = meeting.summaryFiles[fileIndex];
+
+    // Xóa file trên server
+    const filePath = path.join(__dirname, '../', fileToDelete.path);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      console.error('Error deleting file from disk:', error);
+    }
+
+    // Xóa file từ database
+    meeting.summaryFiles.splice(fileIndex, 1);
+    await meeting.save();
+
+    res.json({
+      message: 'Xóa file từ tóm tắt thành công'
+    });
+
+  } catch (error) {
+    console.error('Delete summary file error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi xóa file từ tóm tắt',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   GET /api/meetings/:id/summary-files/:fileId/view
+// @desc    Xem file từ summary trong browser
+// @access  Private
+router.get('/:id/summary-files/:fileId/view', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Kiểm tra quyền truy cập file
+    const canAccess = 
+      meeting.organizer.toString() === req.user._id.toString() ||
+      meeting.attendees.some(att => att.user.toString() === req.user._id.toString()) ||
+      req.user.role === 'admin';
+
+    if (!canAccess) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền truy cập file này'
+      });
+    }
+
+    // Tìm file trong summaryFiles
+    const summaryFile = meeting.summaryFiles.find(
+      file => file._id.toString() === req.params.fileId
+    );
+
+    if (!summaryFile) {
+      return res.status(404).json({
+        message: 'File không tồn tại trong tóm tắt'
+      });
+    }
+
+    // Đường dẫn file trên server
+    const filePath = path.join(__dirname, '../', summaryFile.path);
+    
+    // Kiểm tra file có tồn tại không
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        message: 'File không tìm thấy trên server'
+      });
+    }
+
+    // Xác định MIME type
+    const ext = path.extname(summaryFile.name).toLowerCase();
+    let mimeType = 'application/octet-stream';
+    
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.txt': 'text/plain',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    };
+
+    if (mimeTypes[ext]) {
+      mimeType = mimeTypes[ext];
+    }
+
+    // Set headers để xem inline
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${summaryFile.name}"`);
+    
+    // Stream file về client
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('View summary file error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi xem file',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   GET /api/meetings/:id/summary-files/:fileId/download
+// @desc    Tải xuống file từ summary
+// @access  Private
+router.get('/:id/summary-files/:fileId/download', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    
+    if (!meeting) {
+      return res.status(404).json({
+        message: 'Cuộc họp không tồn tại'
+      });
+    }
+
+    // Kiểm tra quyền truy cập file
+    const canAccess = 
+      meeting.organizer.toString() === req.user._id.toString() ||
+      meeting.attendees.some(att => att.user.toString() === req.user._id.toString()) ||
+      req.user.role === 'admin';
+
+    if (!canAccess) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền truy cập file này'
+      });
+    }
+
+    // Tìm file trong summaryFiles
+    const summaryFile = meeting.summaryFiles.find(
+      file => file._id.toString() === req.params.fileId
+    );
+
+    if (!summaryFile) {
+      return res.status(404).json({
+        message: 'File không tồn tại trong tóm tắt'
+      });
+    }
+
+    // Đường dẫn file trên server
+    const filePath = path.join(__dirname, '../', summaryFile.path);
+    
+    // Kiểm tra file có tồn tại không
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        message: 'File không tìm thấy trên server'
+      });
+    }
+
+    // Set headers để download
+    res.setHeader('Content-Disposition', `attachment; filename="${summaryFile.name}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    
+    // Stream file về client
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('Download summary file error:', error);
+    res.status(500).json({
+      message: 'Lỗi server khi tải file',
       error: process.env.NODE_ENV === 'development' ? error.message : {}
     });
   }

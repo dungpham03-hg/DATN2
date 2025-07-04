@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Card, Badge, Button, Dropdown } from 'react-bootstrap';
 import { FaBell, FaCheck, FaTimes, FaCalendarAlt, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import './NotificationPopup.css';
 
 const NotificationPopup = () => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotification();
   const [showDropdown, setShowDropdown] = useState(false);
 
   const handleNotificationClick = async (notification) => {

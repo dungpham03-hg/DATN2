@@ -118,6 +118,7 @@ const EditMeeting = () => {
   }, [formData.startTime, formData.endTime, token]);
 
   const handleChange = (e) => {
+    if (!e?.target) return;
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
@@ -176,12 +177,12 @@ const EditMeeting = () => {
         <Row>
           <Col>
             <div className="d-flex align-items-center meetings-header mb-4">
-              <Link to={`/meetings/${id}`} className="btn btn-outline-secondary me-3">
+              <Link to="/meetings" className="btn btn-outline-secondary me-3">
                 <FaArrowLeft />
               </Link>
               <div>
                 <h1 className="meetings-title">Chỉnh sửa cuộc họp</h1>
-                <p className="meetings-subtitle">ID: {id}</p>
+              {/*<p className="meetings-subtitle">ID: {id}</p>*/}
               </div>
             </div>
           </Col>
@@ -236,7 +237,7 @@ const EditMeeting = () => {
                         <Form.Select 
                           className="mb-2"
                           value={selectedRoom}
-                          onChange={(e) => setSelectedRoom(e.target.value)}
+                          onChange={(e) => setSelectedRoom(e?.target?.value || '')}
                         >
                           <option value="">-- Chọn phòng họp khả dụng --</option>
                           {availableRooms.map(room => (
@@ -310,7 +311,7 @@ const EditMeeting = () => {
                       <Col md={6}>
                         <Form.Group className="mb-3" controlId="meetingType">
                           <Form.Label>Loại</Form.Label>
-                          <Form.Select name="meetingType" value={formData.meetingType} onChange={(e)=>{handleChange(e); if(e.target.value==='offline') setFormData(prev=>({...prev,meetingLink:''}));}}>
+                          <Form.Select name="meetingType" value={formData.meetingType} onChange={(e)=>{handleChange(e); if(e?.target?.value==='offline') setFormData(prev=>({...prev,meetingLink:''}));}}>
                             <option value="offline">Offline</option>
                             <option value="online">Online</option>
                             <option value="hybrid">Hybrid</option>

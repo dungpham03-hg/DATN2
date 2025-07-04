@@ -30,41 +30,53 @@ app.use(cors());
 app.use(express.json());
 app.use(passport.initialize());
 
-// Connect to MongoDB với cấu hình tối ưu
-mongoose.connect(process.env.MONGODB_URI, {
+// Connect to MongoDB với cấu hình SSL/TLS phù hợp
+const mongoOptions = {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
   maxPoolSize: 10,
   retryWrites: true,
-  w: 'majority'
-})
+  w: 'majority',
+  // Cấu hình TLS để tránh lỗi SSL
+  tls: true,
+  tlsAllowInvalidCertificates: true,
+  tlsAllowInvalidHostnames: true
+};
+
+mongoose.connect(process.env.MONGODB_URI, mongoOptions)
   .then(() => {
     console.log('✅ Connected to MongoDB successfully');
     // Test connection bằng cách tạo một simple query
     return mongoose.connection.db.admin().ping();
   })
   .then(() => {
-    console.log('✅ MongoDB ping successful');
+    console.log('✅ MongoDB ping successful - Database ready!');
   })
   .catch(err => {
     console.error('❌ MongoDB connection error:', err.message);
-    // Thử kết nối lại với cấu hình khác
+    console.log('🔄 Trying simplified connection config...');
+    
+    // Thử với config đơn giản hơn
+    const fallbackOptions = {
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 30000,
+      retryWrites: true
+    };
+    
     setTimeout(() => {
-      console.log('🔄 Retrying MongoDB connection with alternative config...');
-      mongoose.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 15000,
-        socketTimeoutMS: 30000,
-        retryWrites: true,
-        w: 'majority'
-      }).catch(retryErr => {
-        console.error('❌ Retry connection also failed:', retryErr.message);
-      });
-    }, 5000);
+      mongoose.connect(process.env.MONGODB_URI, fallbackOptions)
+        .then(() => console.log('✅ MongoDB connected with fallback config'))
+        .catch(retryErr => {
+          console.error('❌ All connection attempts failed:', retryErr.message);
+          console.log('💡 Please check your MONGODB_URI in environment variables');
+        });
+    }, 2000);
   });
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/meetings', require('./routes/meetings'));
+app.use('/api/minutes', require('./routes/minutes'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/departments', require('./routes/departments'));
 app.use('/api/meeting-rooms', require('./routes/meetingRooms'));

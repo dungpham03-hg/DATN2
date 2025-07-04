@@ -1,17 +1,27 @@
 import React from 'react';
-import NavigationBar from './Navbar';
 import { Outlet } from 'react-router-dom';
+import Navbar from './Navbar';
+import BackdropLoading from '../BackdropLoading';
+import { useGlobalLoading } from '../../contexts/GlobalLoadingContext';
+import './Layout.css';
 
 const Layout = () => {
+  const { isLoading, loadingText, loadingType } = useGlobalLoading();
+
   return (
-    <>
-      {/* Thanh điều hướng chung */}
-      <NavigationBar />
-      {/* Nội dung trang cụ thể */}
-      <div className="container my-4">
+    <div className="layout">
+      <Navbar />
+      <main className="main-content">
         <Outlet />
-      </div>
-    </>
+      </main>
+      
+      {/* Backdrop Loading */}
+      <BackdropLoading 
+        isVisible={isLoading}
+        text={loadingText}
+        type={loadingType}
+      />
+    </div>
   );
 };
 

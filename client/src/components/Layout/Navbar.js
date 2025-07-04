@@ -1,108 +1,97 @@
 import React from 'react';
-import { Navbar, Nav, Container, NavDropdown } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import { Navbar, Nav, NavDropdown, Container } from 'react-bootstrap';
+import { LinkContainer } from 'react-router-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaUser, FaSignOutAlt, FaCalendarAlt } from 'react-icons/fa';
-import { useLocation } from 'react-router-dom';
+import { useNotification } from '../../contexts/NotificationContext';
 import NotificationPopup from '../Notifications/NotificationPopup';
+import { FaCalendarAlt, FaBell } from 'react-icons/fa';
+import './Navbar.css';
 
 const NavigationBar = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { notifications, unreadCount } = useNotification();
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const handleLogout = () => {
+    logout();
   };
 
   return (
-    <Navbar bg="dark" variant="dark" expand="lg" className="mb-4">
-      <Container>
-        <Navbar.Brand as={Link} to="/">Meeting Management</Navbar.Brand>
-        <Navbar.Toggle aria-controls="basic-navbar-nav" />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="me-auto">
-            <Nav.Link as={Link} to="/dashboard" className={location.pathname === '/dashboard' ? 'active' : ''}>
-              Trang chủ
-            </Nav.Link>
-            <Nav.Link as={Link} to="/meetings" className={location.pathname.startsWith('/meetings') ? 'active' : ''}>
-              Cuộc họp
-            </Nav.Link>
-            <Nav.Link as={Link} to="/meeting-rooms" className={location.pathname === '/meeting-rooms' ? 'active' : ''}>
-              Phòng họp
-            </Nav.Link>
-          </Nav>
-          <Nav className="ms-auto">
-            {user ? (
-              <>
-                {/* Notification Bell */}
-                <div className="d-flex align-items-center me-3">
-                  <NotificationPopup />
-                </div>
+    <>
+      <Navbar expand="lg" className="navbar" fixed="top">
+        <Container>
+          {/* Brand */}
+          <LinkContainer to="/dashboard">
+            <Navbar.Brand className="brand-gradient">
+              <FaCalendarAlt className="me-2" />
+              Meeting Pro
+            </Navbar.Brand>
+          </LinkContainer>
 
-                <NavDropdown
+          <Navbar.Toggle aria-controls="basic-navbar-nav" />
+          
+          <Navbar.Collapse id="basic-navbar-nav">
+            {/* Navigation Links */}
+            <Nav className="me-auto">
+              <LinkContainer to="/dashboard">
+                <Nav.Link>Trang chủ</Nav.Link>
+              </LinkContainer>
+              
+              <LinkContainer to="/meetings">
+                <Nav.Link>Cuộc họp</Nav.Link>
+              </LinkContainer>
+              
+              <LinkContainer to="/meeting-rooms">
+                <Nav.Link>Phòng họp</Nav.Link>
+              </LinkContainer>
+            </Nav>
+
+            {/* Right side - Notifications and User */}
+            <Nav className="ms-auto d-flex align-items-center">
+              {/* Notifications */}
+              <div className="notification-container">
+                <NotificationPopup />
+              </div>
+
+              {/* User Dropdown */}
+              {user && (
+                <NavDropdown 
                   title={
-                    <div className="d-inline-flex align-items-center">
-                      <div
-                        className="avatar avatar-sm me-2"
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#e9ecef',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.875rem',
-                          color: '#6c757d',
-                          fontWeight: 'bold'
+                    <div className="user-dropdown-title">
+                      <img 
+                        src={
+                          user.avatar && user.avatar.startsWith('/uploads') 
+                            ? `${API_BASE_URL.replace('/api', '')}${user.avatar}`
+                            : user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.email)}&background=667eea&color=fff&bold=true`
+                        }
+                        alt="Avatar" 
+                        className="avatar avatar-sm rounded-circle me-2"
+                        style={{ width: '32px', height: '32px' }}
+                        onError={(e) => {
+                          // Fallback to UI Avatars if server image fails to load
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.email)}&background=667eea&color=fff&bold=true`;
                         }}
-                      >
-                        {getInitials(user.fullName)}
-                      </div>
-                      <span>{user.fullName}</span>
+                      />
+                      <span>{user.fullName || user.email}</span>
                     </div>
                   }
-                  id="basic-nav-dropdown"
+                  id="user-dropdown"
                   align="end"
-                  style={{ position: 'relative' }}
                 >
-                  <style>
-                    {`
-                      #basic-nav-dropdown + .dropdown-menu {
-                        z-index: 9999 !important;
-                        position: absolute !important;
-                      }
-                    `}
-                  </style>
-                  <NavDropdown.Item as={Link} to="/profile">
-                    <FaUser className="me-2" />
-                    Hồ sơ
-                  </NavDropdown.Item>
+                  <LinkContainer to="/profile">
+                    <NavDropdown.Item>Hồ sơ</NavDropdown.Item>
+                  </LinkContainer>
                   <NavDropdown.Divider />
                   <NavDropdown.Item onClick={handleLogout}>
-                    <FaSignOutAlt className="me-2" />
                     Đăng xuất
                   </NavDropdown.Item>
                 </NavDropdown>
-              </>
-            ) : (
-              <Nav.Link as={Link} to="/login">Đăng nhập</Nav.Link>
-            )}
-          </Nav>
-        </Navbar.Collapse>
-      </Container>
-    </Navbar>
+              )}
+            </Nav>
+          </Navbar.Collapse>
+        </Container>
+      </Navbar>
+    </>
   );
 };
 

@@ -55,6 +55,11 @@ const meetingSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Người tổ chức là bắt buộc']
   },
+  secretary: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+    // Không bắt buộc - có thể không có thư ký
+  },
   attendees: [{
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -75,8 +80,9 @@ const meetingSchema = new mongoose.Schema({
     }
   }],
   agenda: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Agenda'
+    type: String,
+    trim: true,
+    maxlength: [2000, 'Chương trình không được vượt quá 2000 ký tự']
   },
   minutes: {
     type: mongoose.Schema.Types.ObjectId,
@@ -176,6 +182,27 @@ const meetingSchema = new mongoose.Schema({
   summaryImage: {
     type: String // Đường dẫn đến file ảnh tóm tắt
   },
+  summaryFiles: [{
+    name: {
+      type: String,
+      required: true
+    },
+    path: {
+      type: String,
+      required: true
+    },
+    size: {
+      type: Number
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   notes: [{
     text: {
       type: String,
@@ -234,6 +261,7 @@ const meetingSchema = new mongoose.Schema({
 // Index để tối ưu hóa truy vấn
 meetingSchema.index({ startTime: 1 });
 meetingSchema.index({ organizer: 1 });
+meetingSchema.index({ secretary: 1 });
 meetingSchema.index({ 'attendees.user': 1 });
 meetingSchema.index({ status: 1 });
 meetingSchema.index({ department: 1 });
@@ -273,12 +301,17 @@ meetingSchema.pre('save', function(next) {
 
 // Static method để tìm cuộc họp theo organizer
 meetingSchema.statics.findByOrganizer = function(organizerId) {
-  return this.find({ organizer: organizerId }).populate('organizer attendees.user');
+  return this.find({ organizer: organizerId }).populate('organizer secretary attendees.user');
+};
+
+// Static method để tìm cuộc họp theo secretary
+meetingSchema.statics.findBySecretary = function(secretaryId) {
+  return this.find({ secretary: secretaryId }).populate('organizer secretary attendees.user');
 };
 
 // Static method để tìm cuộc họp theo attendee
 meetingSchema.statics.findByAttendee = function(userId) {
-  return this.find({ 'attendees.user': userId }).populate('organizer attendees.user');
+  return this.find({ 'attendees.user': userId }).populate('organizer secretary attendees.user');
 };
 
 // Static method để tìm cuộc họp trong khoảng thời gian

@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Nav, Tab, Form, Button, Alert, Badge } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaUser, FaEdit, FaKey, FaBell, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaUser, FaEdit, FaKey, FaBell, FaEye, FaEyeSlash, FaCamera } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import axios from 'axios';
+import AvatarUpload from '../../components/AvatarUpload/AvatarUpload';
+import './Profile.css';
 
 const Profile = () => {
-  const { user, updateProfile, changePassword } = useAuth();
+  const { user, token, updateProfile, updateUserData, changePassword } = useAuth();
   const [activeTab, setActiveTab] = useState('info');
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
   // States for editing profile
   const [editMode, setEditMode] = useState(false);
@@ -41,8 +46,24 @@ const Profile = () => {
     statusUpdates: user?.notificationSettings?.statusUpdates ?? false,
     weeklyReports: user?.notificationSettings?.weeklyReports ?? true
   });
-  const [notificationLoading, setNotificationLoading] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
+
+
+  // States for avatar upload
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  // Sync notification settings when user data changes
+  useEffect(() => {
+    if (user?.notificationSettings) {
+      setNotificationSettings({
+        emailNotifications: user.notificationSettings.email ?? true,
+        pushNotifications: user.notificationSettings.push ?? true,
+        meetingReminders: user.notificationSettings.meetingReminders ?? true,
+        statusUpdates: user.notificationSettings.statusUpdates ?? false,
+        weeklyReports: user.notificationSettings.weeklyReports ?? true
+      });
+    }
+  }, [user?.notificationSettings]);
 
   const getInitials = (name) => {
     if (!name) return 'U';
@@ -51,6 +72,7 @@ const Profile = () => {
 
   // Profile update handlers
   const handleProfileChange = (e) => {
+    if (!e?.target) return;
     const { name, value } = e.target;
     setProfileData(prev => ({ ...prev, [name]: value }));
   };
@@ -86,6 +108,7 @@ const Profile = () => {
 
   // Password change handlers
   const handlePasswordChange = (e) => {
+    if (!e?.target) return;
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
     // Clear errors when user types
@@ -142,31 +165,135 @@ const Profile = () => {
   };
 
   // Notification handlers
-  const handleNotificationChange = (setting) => {
+  const handleNotificationChange = async (setting) => {
+    const newValue = !notificationSettings[setting];
+    
+    // Update state immediately for instant UI feedback
     setNotificationSettings(prev => ({
       ...prev,
-      [setting]: !prev[setting]
+      [setting]: newValue
     }));
+
+    // Auto-save to server
+    try {
+      const newSettings = {
+        ...notificationSettings,
+        [setting]: newValue
+      };
+
+      const notificationData = {
+        email: newSettings.emailNotifications,
+        push: newSettings.pushNotifications,
+        meetingReminders: newSettings.meetingReminders,
+        statusUpdates: newSettings.statusUpdates,
+        weeklyReports: newSettings.weeklyReports
+      };
+
+      const result = await updateProfile({ 
+        notificationSettings: notificationData
+      }, true); // skipToast = true to avoid too many toast messages
+
+      if (result.success) {
+        // Update user data in context to keep it in sync
+        updateUserData({ 
+          notificationSettings: notificationData
+        });
+      } else {
+        // Revert on failure
+        setNotificationSettings(prev => ({
+          ...prev,
+          [setting]: !newValue
+        }));
+        toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
+      }
+    } catch (error) {
+      console.error('Auto-save notification error:', error);
+      // Revert on error
+      setNotificationSettings(prev => ({
+        ...prev,
+        [setting]: !newValue
+      }));
+      toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
+    }
   };
 
-  const handleNotificationSave = async () => {
-    setNotificationLoading(true);
-    setNotificationMessage('');
-    
+
+
+  // Avatar upload handlers
+  const handleAvatarClick = () => {
+    setShowAvatarModal(true);
+  };
+
+  const handleAvatarUpload = async (file, setProgress) => {
+    setAvatarLoading(true);
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setNotificationMessage('Cài đặt thông báo đã được lưu!');
-      setTimeout(() => setNotificationMessage(''), 3000);
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await axios.post(`${API_BASE_URL}/auth/upload-avatar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setProgress(percentCompleted);
+        }
+      });
+
+      if (response.data.success) {
+        // Cập nhật ngay lập tức trong context để đồng bộ
+        updateUserData({ avatar: response.data.avatarUrl });
+        
+        // Sau đó cập nhật vào database 
+        await updateProfile({ avatar: response.data.avatarUrl }, true);
+        
+        // Toast success message
+        toast.success('Ảnh đại diện đã được cập nhật!');
+        setShowAvatarModal(false);
+      }
     } catch (error) {
-      setNotificationMessage('Lưu cài đặt thất bại. Vui lòng thử lại.');
+      console.error('Avatar upload error:', error);
+      toast.error('Cập nhật ảnh đại diện thất bại. Vui lòng thử lại.');
+      throw error;
     } finally {
-      setNotificationLoading(false);
+      setAvatarLoading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarLoading(true);
+
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/auth/remove-avatar`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data.success) {
+        // Cập nhật ngay lập tức trong context để đồng bộ
+        updateUserData({ avatar: null });
+        
+        // Sau đó cập nhật vào database
+        await updateProfile({ avatar: null }, true);
+        
+        // Toast success message
+        toast.success('Đã xóa ảnh đại diện!');
+        setShowAvatarModal(false);
+      }
+    } catch (error) {
+      console.error('Remove avatar error:', error);
+      toast.error('Xóa ảnh đại diện thất bại. Vui lòng thử lại.');
+      throw error;
+    } finally {
+      setAvatarLoading(false);
     }
   };
 
   return (
-    <Container className="py-4">
+    <Container className="py-4 profile-page">
       <Row>
         <Col>
           <h2 className="mb-4">Thông tin cá nhân</h2>
@@ -198,22 +325,71 @@ const Profile = () => {
                   {/* Thông tin cá nhân */}
                   <Tab.Pane eventKey="info">
                     <div className="text-center mb-4">
-                      <div
-                        className="profile-avatar mx-auto mb-3"
-                        style={{
-                          width: '120px',
-                          height: '120px',
-                          borderRadius: '50%',
-                          backgroundColor: '#e9ecef',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '2.5rem',
-                          color: '#6c757d',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {getInitials(user?.fullName)}
+                      <div className="position-relative d-inline-block avatar-container">
+                        <div
+                          className="profile-avatar mx-auto mb-3"
+                          tabIndex={0}
+                          role="button"
+                          aria-label="Thay đổi ảnh đại diện"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleAvatarClick();
+                            }
+                          }}
+                          style={{
+                            width: '120px',
+                            height: '120px',
+                            borderRadius: '50%',
+                            backgroundColor: user?.avatar ? 'transparent' : '#e9ecef',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '2.5rem',
+                            color: '#6c757d',
+                            fontWeight: 'bold',
+                            backgroundImage: user?.avatar ? `url(${
+                              user.avatar.startsWith('/uploads') 
+                                ? `${API_BASE_URL.replace('/api', '')}${user.avatar}`
+                                : user.avatar
+                            })` : 'none',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            border: '3px solid #dee2e6',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            position: 'relative'
+                          }}
+                          onClick={handleAvatarClick}
+                        >
+                          {!user?.avatar && getInitials(user?.fullName)}
+                          
+                          {/* Overlay với icon camera */}
+                          <div 
+                            className="avatar-overlay"
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              borderRadius: '50%',
+                              background: 'rgba(0, 0, 0, 0.5)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              opacity: 0,
+                              transition: 'opacity 0.3s ease'
+                            }}
+                          >
+                            <FaCamera 
+                              style={{
+                                color: 'white',
+                                fontSize: '1.5rem'
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <h4>{user?.fullName}</h4>
                       <p className="text-muted">{user?.email}</p>
@@ -463,11 +639,6 @@ const Profile = () => {
 
                   {/* Thông báo */}
                   <Tab.Pane eventKey="notifications">
-                    {notificationMessage && (
-                      <Alert variant={notificationMessage.includes('thành công') ? 'success' : 'danger'}>
-                        {notificationMessage}
-                      </Alert>
-                    )}
 
                     <Form>
                       <Form.Group className="mb-3">
@@ -535,14 +706,8 @@ const Profile = () => {
                         </Form.Text>
                       </Form.Group>
 
-                      <div className="d-flex justify-content-end">
-                        <Button
-                          variant="primary"
-                          onClick={handleNotificationSave}
-                          disabled={notificationLoading}
-                        >
-                          {notificationLoading ? 'Đang lưu...' : 'Lưu cài đặt'}
-                        </Button>
+                      <div className="text-muted text-center mt-3">
+                        <small>Cài đặt được lưu tự động khi bạn thay đổi</small>
                       </div>
                     </Form>
                   </Tab.Pane>
@@ -552,6 +717,17 @@ const Profile = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUpload
+        show={showAvatarModal}
+        onHide={() => setShowAvatarModal(false)}
+        currentAvatar={user?.avatar}
+        onUpload={handleAvatarUpload}
+        onRemove={handleRemoveAvatar}
+        loading={avatarLoading}
+        userName={user?.fullName}
+      />
     </Container>
   );
 };

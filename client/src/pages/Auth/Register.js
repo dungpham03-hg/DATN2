@@ -35,6 +35,7 @@ const Register = () => {
   }, [isAuthenticated, navigate]);
 
   const handleChange = (e) => {
+    if (!e?.target) return;
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,

@@ -1,14 +1,48 @@
 import { createTheme } from '@mui/material/styles';
 
-// Có thể tuỳ chỉnh theme tại đây nếu muốn
+// Modern font system theme
 const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1976d2'
+      main: '#6366f1'
     },
     secondary: {
-      main: '#dc004e'
+      main: '#64748b'
+    }
+  },
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      'Oxygen',
+      'Ubuntu',
+      'Cantarell',
+      '"Fira Sans"',
+      '"Droid Sans"',
+      '"Helvetica Neue"',
+      'sans-serif'
+    ].join(','),
+    fontSize: 14,
+    h1: {
+      fontWeight: 700,
+      letterSpacing: '-0.025em'
+    },
+    h2: {
+      fontWeight: 600,
+      letterSpacing: '-0.025em'
+    },
+    h3: {
+      fontWeight: 600,
+      letterSpacing: '-0.025em'
+    },
+    body1: {
+      lineHeight: 1.7
+    },
+    body2: {
+      lineHeight: 1.6
     }
   }
 });

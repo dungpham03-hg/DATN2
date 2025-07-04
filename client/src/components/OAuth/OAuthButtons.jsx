@@ -18,12 +18,16 @@ const OAuthButtons = () => {
       
       <Button
         variant="outlined"
-        startIcon={<GoogleIcon />}
+        startIcon={<GoogleIcon sx={{ fontSize: 24 }} />}
         onClick={() => handleOAuthLogin('google')}
         fullWidth
         sx={{
           borderColor: '#4285f4',
           color: '#4285f4',
+          height: 56,
+          fontSize: '1.1rem',
+          fontWeight: 500,
+          py: 2,
           '&:hover': {
             borderColor: '#4285f4',
             backgroundColor: 'rgba(66, 133, 244, 0.04)'

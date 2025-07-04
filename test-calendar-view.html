@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Calendar View - Meeting Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .feature-box { border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+        .code-snippet { background: #f8f9fa; padding: 1rem; border-radius: 6px; font-family: 'Courier New', monospace; }
+        .step { background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 1rem; border-radius: 8px; margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">📅 Test Weekly Calendar View</h1>
+        <p class="text-center text-muted mb-4">Hướng dẫn test tính năng lịch tuần mới cho Meeting Management</p>
+
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                
+                <!-- Tính năng mới -->
+                <div class="feature-box">
+                    <h3>🆕 Tính năng mới đã thêm:</h3>
+                    <ul>
+                        <li><strong>Weekly Calendar View:</strong> Hiển thị cuộc họp theo lịch tuần</li>
+                        <li><strong>Toggle View:</strong> Chuyển đổi giữa danh sách và lịch</li>
+                        <li><strong>Time Slots:</strong> Chia thời gian theo Sáng/Chiều/Tối</li>
+                        <li><strong>Responsive Design:</strong> Tương thích mobile</li>
+                        <li><strong>Meeting Cards:</strong> Hiển thị thông tin chi tiết cuộc họp</li>
+                    </ul>
+                </div>
+
+                <!-- Hướng dẫn test -->
+                <div class="feature-box">
+                    <h3>🧪 Cách test:</h3>
+                    
+                    <div class="step">
+                        <strong>Bước 1:</strong> Khởi động ứng dụng
+                        <div class="code-snippet mt-2">
+                            cd client && npm start<br>
+                            cd server && npm start
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <strong>Bước 2:</strong> Truy cập trang Meetings
+                        <div class="code-snippet mt-2">
+                            http://localhost:3000/meetings
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <strong>Bước 3:</strong> Test toggle view
+                        <ul class="mt-2">
+                            <li>Click button "Danh sách" - Xem list view</li>
+                            <li>Click button "Lịch tuần" - Xem calendar view</li>
+                        </ul>
+                    </div>
+
+                    <div class="step">
+                        <strong>Bước 4:</strong> Test calendar navigation
+                        <ul class="mt-2">
+                            <li>Click "Tuần trước" / "Tuần sau"</li>
+                            <li>Click "Tuần hiện tại" để về tuần này</li>
+                        </ul>
+                    </div>
+
+                    <div class="step">
+                        <strong>Bước 5:</strong> Test meeting interaction
+                        <ul class="mt-2">
+                            <li>Click vào meeting card để xem chi tiết</li>
+                            <li>Hover để xem effects</li>
+                            <li>Kiểm tra responsive trên mobile</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Demo Data -->
+                <div class="feature-box">
+                    <h3>🎯 Demo Data có sẵn:</h3>
+                    <p>Ứng dụng sẽ tự động tạo meetings demo với thời gian thực:</p>
+                    <ul>
+                        <li><strong>Hôm nay:</strong> Daily Standup (9:00), Planning Sprint (14:00)</li>
+                        <li><strong>Ngày mai:</strong> Code Review (10:00), Demo khách hàng (15:00)</li>
+                        <li><strong>Thứ 3:</strong> Họp Marketing (8:30), Training (19:00)</li>
+                        <li><strong>Hôm qua:</strong> Retrospective (16:00) - Completed</li>
+                    </ul>
+                </div>
+
+                <!-- Features -->
+                <div class="feature-box">
+                    <h3>✨ Chi tiết tính năng:</h3>
+                    
+                    <h5>📋 Layout Calendar:</h5>
+                    <ul>
+                        <li>Grid 8 cột: Time + 7 ngày trong tuần</li>
+                        <li>Time slots: 7-22h chia theo Sáng/Chiều/Tối</li>
+                        <li>Header hiển thị tên ngày + ngày tháng</li>
+                    </ul>
+
+                    <h5>📱 Meeting Cards:</h5>
+                    <ul>
+                        <li>Tiêu đề meeting</li>
+                        <li>Thời gian bắt đầu - kết thúc</li>
+                        <li>Địa điểm</li>
+                        <li>Status badge với màu sắc</li>
+                        <li>Border màu theo trạng thái</li>
+                    </ul>
+
+                    <h5>🎨 UI/UX:</h5>
+                    <ul>
+                        <li>Hover effects cho meetings</li>
+                        <li>Smooth animations</li>
+                        <li>Color coding theo status</li>
+                        <li>Click để xem chi tiết</li>
+                    </ul>
+                </div>
+
+                <!-- Files đã tạo -->
+                <div class="feature-box">
+                    <h3>📁 Files đã tạo/sửa:</h3>
+                    <div class="code-snippet">
+                        ✅ client/src/pages/Meetings/WeeklyCalendar.jsx - Component chính<br>
+                        ✅ client/src/pages/Meetings/WeeklyCalendar.css - Styles<br>
+                        ✅ client/src/pages/Meetings/Meetings.js - Tích hợp toggle<br>
+                        ✅ test-calendar-view.html - File hướng dẫn này
+                    </div>
+                </div>
+
+                <!-- URLs test -->
+                <div class="feature-box">
+                    <h3>🌐 Test URLs:</h3>
+                    <div class="d-grid gap-2">
+                        <a href="http://localhost:3000/meetings" class="btn btn-primary" target="_blank">
+                            📅 Trang Meetings (List + Calendar)
+                        </a>
+                        <a href="http://localhost:3000/meetings/create" class="btn btn-outline-success" target="_blank">
+                            ➕ Tạo cuộc họp mới
+                        </a>
+                        <a href="http://localhost:3000" class="btn btn-outline-info" target="_blank">
+                            🏠 Dashboard
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Responsive Test -->
+                <div class="feature-box">
+                    <h3>📱 Test Responsive:</h3>
+                    <p>Thử thay đổi kích thước browser để xem responsive:</p>
+                    <ul>
+                        <li><strong>Desktop (>1200px):</strong> Full grid layout</li>
+                        <li><strong>Tablet (768-1200px):</strong> Compressed layout</li>
+                        <li><strong>Mobile (<768px):</strong> Vertical stacked, smaller text</li>
+                    </ul>
+                </div>
+
+                <div class="text-center mt-4">
+                    <p class="text-success"><strong>✅ Calendar View sẵn sàng sử dụng!</strong></p>
+                    <small class="text-muted">
+                        Tích hợp hoàn tất - Switch giữa List và Calendar view trong trang Meetings
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

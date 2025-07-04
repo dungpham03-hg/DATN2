@@ -154,61 +154,105 @@ const Login = () => {
               </Typography>
             </Divider>
             
-            {/* Google Login chỉ hiển thị icon */}
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <GoogleLogin
-                type="icon"
-                shape="circle"
-                theme="outline"
-                onSuccess={async (credentialResponse) => {
-                  try {
-                    const { credential } = credentialResponse;
-                    if (!credential) throw new Error('Không nhận được credential');
-
-                    setLoading(true);
-                    // Gửi credential sang backend để đổi JWT nội bộ
-                    const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
-                    const res = await fetch(`${apiUrl}/auth/google-token`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({ credential })
-                    });
-                    if (!res.ok) {
-                      const errData = await res.json();
-                      throw new Error(errData.message || 'Xác thực Google thất bại');
-                    }
-                    const data = await res.json();
-
-                    await login(data.token, undefined, data.user);
-                    navigate('/dashboard');
-                  } catch (err) {
-                    console.error(err);
-                    setError(err.message);
-                  } finally {
-                    setLoading(false);
-                  }
+            {/* OAuth Buttons với thiết kế cải thiện */}
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                gap: 3,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              {/* Google Login Button */}
+              <Box 
+                sx={{ 
+                  width: 48,
+                  height: 48,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative'
                 }}
-                onError={() => setError('Đăng nhập Google thất bại')}
-              />
+              >
+                <GoogleLogin
+                  type="icon"
+                  shape="circle"
+                  theme="outline"
+                  size="large"
+                  onSuccess={async (credentialResponse) => {
+                    try {
+                      const { credential } = credentialResponse;
+                      if (!credential) throw new Error('Không nhận được credential');
 
-              {/* GitHub Login chỉ hiển thị icon */}
+                      setLoading(true);
+                      // Gửi credential sang backend để đổi JWT nội bộ
+                      const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+                      const res = await fetch(`${apiUrl}/auth/google-token`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ credential })
+                      });
+                      if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.message || 'Xác thực Google thất bại');
+                      }
+                      const data = await res.json();
+
+                      await login(data.token, undefined, data.user);
+                      navigate('/dashboard');
+                    } catch (err) {
+                      console.error(err);
+                      setError(err.message);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onError={() => setError('Đăng nhập Google thất bại')}
+                />
+              </Box>
+
+              {/* GitHub Login Button */}
               <IconButton
                 onClick={() => handleOAuthLogin('github')}
                 sx={{
-                  border: '1px solid #24292e',
                   width: 44,
                   height: 44,
+                  border: '2px solid #24292e',
+                  borderRadius: '50%',
                   color: '#24292e',
+                  backgroundColor: 'white',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  transition: 'all 0.3s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(36, 41, 46, 0.04)'
+                    backgroundColor: '#24292e',
+                    color: 'white',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(36, 41, 46, 0.3)',
+                    borderColor: '#24292e'
+                  },
+                  '&:active': {
+                    transform: 'translateY(0px)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                   }
                 }}
               >
-                <GitHubIcon />
+                <GitHubIcon sx={{ fontSize: 24 }} />
               </IconButton>
             </Box>
+
+            {/* Thêm text mô tả cho các nút */}
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              sx={{ 
+                textAlign: 'center',
+                mt: 1,
+                fontSize: '0.75rem'
+              }}
+            >
+            </Typography>
           </Stack>
 
           <Box sx={{ mt: 2 }}>

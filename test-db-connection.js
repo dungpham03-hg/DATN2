@@ -6,10 +6,17 @@ const MeetingRoom = require('./server/models/MeetingRoom');
 async function testDatabase() {
   try {
     console.log('🔌 Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI, {
+    
+    // Sử dụng cùng config với server để tránh SSL errors
+    const mongoOptions = {
       serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 30000
-    });
+      socketTimeoutMS: 30000,
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      tlsAllowInvalidHostnames: true
+    };
+    
+    await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
     console.log('✅ Connected to MongoDB successfully!');
 
     // Test 1: Count all meeting rooms

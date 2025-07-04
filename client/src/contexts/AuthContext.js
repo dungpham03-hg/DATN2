@@ -79,6 +79,8 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  
+
 
   // Set up axios interceptors
   useEffect(() => {
@@ -134,8 +136,6 @@ export const AuthProvider = ({ children }) => {
         dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
         return;
       }
-
-      console.log('🔍 Checking auth with token:', token);
       
       // Lấy thông tin user
       const response = await axios.get(`${API_BASE_URL}/auth/me`, {
@@ -143,8 +143,6 @@ export const AuthProvider = ({ children }) => {
           Authorization: `Bearer ${token}`
         }
       });
-      
-      console.log('✅ Got user info:', response.data);
       
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
@@ -154,7 +152,6 @@ export const AuthProvider = ({ children }) => {
         }
       });
     } catch (error) {
-      console.error('❌ Auth check failed:', error);
       localStorage.removeItem('token');
       dispatch({ type: AUTH_ACTIONS.AUTH_ERROR });
     }
@@ -173,14 +170,12 @@ export const AuthProvider = ({ children }) => {
       // Nếu chỉ có một tham số và nó là string dài, coi như đó là token từ OAuth
       if (typeof emailOrToken === 'string' && !password && emailOrToken.length > 50) {
         token = emailOrToken;
-        console.log('🔑 Using OAuth token:', token);
         
         // Lưu token vào localStorage
         localStorage.setItem('token', token);
 
         if (userOverride) {
           user = userOverride;
-          console.log('⚡️ Using user passed from OAuth:', user);
         } else {
           // Lấy thông tin user
           try {
@@ -190,9 +185,7 @@ export const AuthProvider = ({ children }) => {
               }
             });
             user = response.data.user;
-            console.log('✅ Got user info:', user);
           } catch (error) {
-            console.error('❌ Failed to get user info:', error);
             localStorage.removeItem('token');
             throw new Error('Không thể lấy thông tin người dùng');
           }
@@ -208,7 +201,6 @@ export const AuthProvider = ({ children }) => {
           user = response.data.user;
           localStorage.setItem('token', token);
         } catch (error) {
-          console.error('❌ Login failed:', error);
           throw error;
         }
       }
@@ -222,10 +214,8 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      console.log('✨ Login successful, state updated');
       return { user, token };
     } catch (error) {
-      console.error('🚨 Login error:', error);
       dispatch({ type: AUTH_ACTIONS.AUTH_ERROR });
       throw error;
     } finally {
@@ -276,22 +266,35 @@ export const AuthProvider = ({ children }) => {
   );
 
   // Update user profile
-  const updateProfile = async (userData) => {
+  const updateProfile = async (userData, skipToast = false) => {
     try {
       const response = await axios.put(`${API_BASE_URL}/auth/profile`, userData);
       
+      // Cập nhật ngay lập tức trong context
       dispatch({
         type: AUTH_ACTIONS.UPDATE_USER,
         payload: response.data.user
       });
 
-      toast.success('Cập nhật profile thành công!');
-      return { success: true };
+      if (!skipToast) {
+        toast.success('Cập nhật profile thành công!');
+      }
+      return { success: true, user: response.data.user };
     } catch (error) {
       const message = error.response?.data?.message || 'Cập nhật profile thất bại';
-      toast.error(message);
+      if (!skipToast) {
+        toast.error(message);
+      }
       return { success: false, message };
     }
+  };
+
+  // Update user data immediately (for real-time sync)
+  const updateUserData = (userData) => {
+    dispatch({
+      type: AUTH_ACTIONS.UPDATE_USER,
+      payload: { ...state.user, ...userData }
+    });
   };
 
   // Change password
@@ -318,6 +321,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    updateUserData,
     changePassword,
     checkAuth
   };

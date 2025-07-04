@@ -10,11 +10,46 @@ const {
 const passport = require('passport');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
 // Thêm hằng CLIENT_URL (cho phép fallback về localhost:3000 khi biến môi trường không thiết lập)
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
+// Cấu hình multer cho upload avatar
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '../uploads/avatars');
+    // Tạo thư mục nếu chưa tồn tại
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Tạo tên file unique: userId-timestamp.extension
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, req.user._id + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+  fileFilter: function (req, file, cb) {
+    // Chỉ cho phép file ảnh
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file ảnh!'), false);
+    }
+  }
+});
 
 // Validation rules
 const registerValidation = [
@@ -815,6 +850,90 @@ router.get('/users', authenticateToken, async (req, res) => {
     console.error('Get users error:', error);
     res.status(500).json({ 
       message: 'Lỗi server khi lấy danh sách người dùng',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   POST /api/auth/upload-avatar
+// @desc    Upload ảnh đại diện
+// @access  Private
+router.post('/upload-avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Không có file được upload' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'Người dùng không tồn tại' });
+    }
+
+    // Xóa ảnh cũ nếu có
+    if (user.avatar && user.avatar.includes('/uploads/avatars/')) {
+      const oldAvatarPath = path.join(__dirname, '../', user.avatar);
+      if (fs.existsSync(oldAvatarPath)) {
+        fs.unlinkSync(oldAvatarPath);
+      }
+    }
+
+    // Cập nhật đường dẫn ảnh mới
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    user.avatar = avatarUrl;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Upload ảnh đại diện thành công',
+      avatarUrl: avatarUrl
+    });
+
+  } catch (error) {
+    console.error('Upload avatar error:', error);
+    
+    // Xóa file đã upload nếu có lỗi
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi server khi upload ảnh đại diện',
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+});
+
+// @route   DELETE /api/auth/remove-avatar
+// @desc    Xóa ảnh đại diện
+// @access  Private
+router.delete('/remove-avatar', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'Người dùng không tồn tại' });
+    }
+
+    // Xóa file ảnh nếu có
+    if (user.avatar && user.avatar.includes('/uploads/avatars/')) {
+      const avatarPath = path.join(__dirname, '../', user.avatar);
+      if (fs.existsSync(avatarPath)) {
+        fs.unlinkSync(avatarPath);
+      }
+    }
+
+    // Cập nhật database
+    user.avatar = null;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Xóa ảnh đại diện thành công'
+    });
+
+  } catch (error) {
+    console.error('Remove avatar error:', error);
+    res.status(500).json({ 
+      message: 'Lỗi server khi xóa ảnh đại diện',
       error: process.env.NODE_ENV === 'development' ? error.message : {}
     });
   }

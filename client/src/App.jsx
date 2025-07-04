@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -5,6 +6,7 @@ import theme from './theme';
 import { AuthProvider } from './contexts/AuthContext';
 import SocketProvider from './contexts/SocketContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { GlobalLoadingProvider } from './contexts/GlobalLoadingContext';
 import PrivateRoute from './components/Auth/PrivateRoute';
 import PublicOnlyRoute from './components/Auth/PublicOnlyRoute';
 import RoleRoute from './components/Auth/RoleRoute';
@@ -21,10 +23,12 @@ import EditMeeting from './pages/Meetings/EditMeeting';
 import MeetingRooms from './pages/MeetingRooms/MeetingRooms';
 import OAuthCallback from './components/OAuth/OAuthCallback';
 
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <GlobalLoadingProvider>
       <AuthProvider>
         <SocketProvider>
           <NotificationProvider>
@@ -58,6 +62,7 @@ function App() {
           </NotificationProvider>
         </SocketProvider>
       </AuthProvider>
+    </GlobalLoadingProvider>
     </ThemeProvider>
   );
 }

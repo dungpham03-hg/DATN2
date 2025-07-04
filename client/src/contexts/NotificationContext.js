@@ -1,14 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
+import { ToastContainer } from '../components/Toast';
 
 const NotificationContext = createContext();
 
-export const useNotifications = () => {
+export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
+    throw new Error('useNotification must be used within NotificationProvider');
   }
   return context;
 };
@@ -19,6 +20,7 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [toasts, setToasts] = useState([]);
   
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -136,6 +138,28 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [token, user]);
 
+  const addToast = useCallback((message, type = 'info', duration = 4000) => {
+    const id = Date.now() + Math.random();
+    const newToast = {
+      id,
+      message,
+      type,
+      duration
+    };
+    
+    setToasts(prev => [...prev, newToast]);
+    return id;
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  const success = useCallback((message, duration) => addToast(message, 'success', duration), [addToast]);
+  const error = useCallback((message, duration) => addToast(message, 'error', duration), [addToast]);
+  const warning = useCallback((message, duration) => addToast(message, 'warning', duration), [addToast]);
+  const info = useCallback((message, duration) => addToast(message, 'info', duration), [addToast]);
+
   const value = {
     notifications,
     unreadCount,
@@ -143,12 +167,19 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
-    deleteNotification
+    deleteNotification,
+    success,
+    error,
+    warning,
+    info,
+    addToast,
+    removeToast
   };
 
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </NotificationContext.Provider>
   );
 }; 
