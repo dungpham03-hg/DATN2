@@ -44,6 +44,9 @@ const NavigationBar = () => {
               <LinkContainer to="/meeting-rooms">
                 <Nav.Link>Phòng họp</Nav.Link>
               </LinkContainer>
+              <LinkContainer to="/archives">
+                <Nav.Link>Lưu trữ</Nav.Link>
+              </LinkContainer>
             </Nav>
 
             {/* Right side - Notifications and User */}

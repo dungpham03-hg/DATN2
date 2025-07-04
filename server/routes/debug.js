@@ -5,6 +5,8 @@ const MeetingRoom = require('../models/MeetingRoom');
 const Meeting = require('../models/Meeting');
 const Minutes = require('../models/Minutes');
 const { authenticateToken } = require('../middleware/auth');
+const Archive = require('../models/Archive');
+const Notification = require('../models/Notification');
 
 // @route   GET /api/debug/db-info
 // @desc    Kiểm tra thông tin database connection
@@ -370,6 +372,178 @@ router.post('/test-create-minutes', authenticateToken, async (req, res) => {
     res.status(500).json({ 
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Test archive creation
+router.get('/test-archive', authenticateToken, async (req, res) => {
+  try {
+    // Tìm cuộc họp completed
+    const meetings = await Meeting.find({ status: 'completed' })
+      .populate('organizer', 'fullName email department position')
+      .populate('secretary', 'fullName email department position')
+      .populate('attendees.user', 'fullName email department position')
+      .populate('minutes')
+      .limit(5);
+
+    console.log(`Found ${meetings.length} completed meetings`);
+
+    const results = [];
+    for (const meeting of meetings) {
+      const exists = await Archive.exists({ meeting: meeting._id });
+      
+      results.push({
+        meetingId: meeting._id,
+        title: meeting.title,
+        status: meeting.status,
+        endTime: meeting.endTime,
+        hasArchive: !!exists,
+        organizer: meeting.organizer?.fullName
+      });
+
+      if (!exists) {
+        // Tạo archive thử
+        try {
+          const meetingSnapshot = {
+            title: meeting.title,
+            description: meeting.description,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            actualEndTime: meeting.actualEndTime,
+            location: meeting.location,
+            meetingType: meeting.meetingType,
+            status: meeting.status,
+            priority: meeting.priority,
+            department: meeting.department,
+            organizer: meeting.organizer,
+            secretary: meeting.secretary,
+            attendees: meeting.attendees,
+            attendeeCount: meeting.attendees.length,
+            duration: Math.round((meeting.endTime - meeting.startTime) / (1000 * 60))
+          };
+
+          const archiveData = {
+            meeting: meeting._id,
+            title: `Lưu trữ - ${meeting.title}`,
+            archiveType: 'complete',
+            meetingSnapshot,
+            createdBy: meeting.organizer?._id || req.user._id,
+            documents: [],
+            tags: meeting.tags || [],
+            access: {
+              isPublic: true, // Tạm thời public để test
+              allowedDepartments: [meeting.department]
+            }
+          };
+
+          // Minutes snapshot nếu có
+          if (meeting.minutes) {
+            const minutes = await Minutes.findById(meeting.minutes)
+              .populate('secretary', 'fullName email')
+              .populate('approvedBy', 'fullName email');
+            if (minutes) {
+              archiveData.minutesSnapshot = {
+                _id: minutes._id,
+                title: minutes.title,
+                content: minutes.content,
+                status: minutes.status,
+                voteDeadline: minutes.voteDeadline,
+                isApproved: minutes.isApproved,
+                secretary: minutes.secretary,
+                approvedBy: minutes.approvedBy,
+                approvedAt: minutes.approvedAt
+              };
+            }
+          }
+
+          // Notifications
+          const notifications = await Notification.find({ 'data.meetingId': meeting._id }).limit(20);
+          archiveData.notifications = notifications.map(n => ({
+            _id: n._id,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            createdAt: n.createdAt,
+            sender: n.sender
+          }));
+
+          const archive = await Archive.create(archiveData);
+          console.log(`✅ Created archive for ${meeting._id}`);
+          
+          results[results.length - 1].archiveCreated = true;
+          results[results.length - 1].archiveId = archive._id;
+        } catch (archiveErr) {
+          console.error('Error creating archive:', archiveErr);
+          results[results.length - 1].archiveError = archiveErr.message;
+        }
+      }
+    }
+
+    res.json({
+      message: 'Test archive completed',
+      results,
+      totalCompleted: meetings.length
+    });
+
+  } catch (error) {
+    console.error('Test archive error:', error);
+    res.status(500).json({
+      message: 'Test failed',
+      error: error.message
+    });
+  }
+});
+
+// Debug meeting data
+router.get('/meeting-data/:id', authenticateToken, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id)
+      .populate('organizer', 'fullName email')
+      .populate('secretary', 'fullName email')
+      .populate('minutes')
+      .populate('notes.author', 'fullName')
+      .populate('summaryMessages.author', 'fullName');
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    const result = {
+      meeting: {
+        _id: meeting._id,
+        title: meeting.title,
+        status: meeting.status,
+        hasMinutes: !!meeting.minutes,
+        hasSummary: !!meeting.summary,
+        hasNotes: meeting.notes && meeting.notes.length > 0,
+        hasSummaryMessages: meeting.summaryMessages && meeting.summaryMessages.length > 0,
+        hasAttachments: meeting.attachments && meeting.attachments.length > 0
+      },
+      minutes: meeting.minutes ? {
+        _id: meeting.minutes._id,
+        title: meeting.minutes.title,
+        content: meeting.minutes.content ? meeting.minutes.content.substring(0, 200) + '...' : null,
+        status: meeting.minutes.status,
+        isApproved: meeting.minutes.isApproved,
+        decisionsCount: meeting.minutes.decisions ? meeting.minutes.decisions.length : 0,
+        votesCount: meeting.minutes.votes ? meeting.minutes.votes.length : 0
+      } : null,
+      summary: meeting.summary || null,
+      notesCount: meeting.notes ? meeting.notes.length : 0,
+      summaryMessagesCount: meeting.summaryMessages ? meeting.summaryMessages.length : 0
+    };
+
+    res.json({
+      message: 'Meeting data retrieved',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('Debug meeting data error:', error);
+    res.status(500).json({
+      message: 'Error retrieving meeting data',
+      error: error.message
     });
   }
 });

@@ -22,6 +22,8 @@ import CreateMeeting from './pages/Meetings/CreateMeeting';
 import EditMeeting from './pages/Meetings/EditMeeting';
 import MeetingRooms from './pages/MeetingRooms/MeetingRooms';
 import OAuthCallback from './components/OAuth/OAuthCallback';
+import Archives from './pages/Archives/Archives';
+import ArchiveDetail from './pages/Archives/ArchiveDetail';
 
 
 function App() {
@@ -52,6 +54,8 @@ function App() {
                   <Route path="/meetings/create" element={<RoleRoute allowedRoles={['admin', 'manager', 'secretary']}><CreateMeeting /></RoleRoute>} />
                   <Route path="/meetings/:id" element={<MeetingDetail />} />
                   <Route path="/meetings/:id/edit" element={<RoleRoute allowedRoles={['admin', 'manager', 'secretary']}><EditMeeting /></RoleRoute>} />
+                  <Route path="/archives" element={<Archives />} />
+                  <Route path="/archives/:id" element={<ArchiveDetail />} />
                   <Route path="/meeting-rooms" element={<MeetingRooms />} />
                 </Route>
 
